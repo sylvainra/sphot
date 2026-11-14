@@ -54,6 +54,18 @@ function evaluateFlagTransition(previous, next) {
     return {error: "flag_color_requires_lowered"};
   }
 
+  const positionChanged = oldPosition !== newPosition;
+  const oldPurple = previous && previous.purpleFlagActive === true;
+  const oldWindsock = previous && previous.windsockActive === true;
+  const newPurple = typeof next.purpleFlagActive === "boolean" ?
+    next.purpleFlagActive : oldPurple;
+  const newWindsock = typeof next.windsockActive === "boolean" ?
+    next.windsockActive : oldWindsock;
+  // La désactivation des signaux complémentaires reste possible à tout
+  // moment. Toute autre manœuvre exige une plage Admin ouverte.
+  const requiresOpenSurveillance = colorChanged || positionChanged ||
+    (!oldPurple && newPurple) || (!oldWindsock && newWindsock);
+
   const journalLines = [];
   if (colorChanged) {
     journalLines.push(
@@ -67,6 +79,17 @@ function evaluateFlagTransition(previous, next) {
     );
   }
 
+  if (oldPurple !== newPurple) {
+    journalLines.push(
+        `Drapeau violet : ${newPurple ? "Activé" : "Désactivé"}`,
+    );
+  }
+  if (oldWindsock !== newWindsock) {
+    journalLines.push(
+        `Manche à air : ${newWindsock ? "Activée" : "Désactivée"}`,
+    );
+  }
+
   const flagWasLowered = oldPosition !== "Affalé" &&
       newPosition === "Affalé";
   const flagWasRaised = oldPosition === "Affalé" &&
@@ -74,6 +97,7 @@ function evaluateFlagTransition(previous, next) {
 
   return {
     journalLines,
+    requiresOpenSurveillance,
     flagWasLowered,
     flagWasRaised,
     loweredFlagColor: flagWasLowered ? newColor : "",

@@ -50,6 +50,7 @@ class _SauveteurActionsRapidesPageState
   bool _confirmedWindsockActive = false;
   bool _liveFlagLoaded = false;
   bool _flagWriteInProgress = false;
+  String? _dragRequestedFlagPosition;
 
   bool get _canChangeFlagColor =>
       widget.isSphotOn &&
@@ -415,12 +416,12 @@ class _SauveteurActionsRapidesPageState
             break;
           case 'surveillance_closed':
             _liveStatusMessage =
-                'Hissage refusé : le poste est hors des horaires '
+                'Manœuvre refusée : le poste est hors des horaires '
                 'de surveillance définis par SPHOT Admin.';
             break;
           case 'surveillance_schedule_missing':
             _liveStatusMessage =
-                'Hissage refusé : aucune période de surveillance '
+                'Manœuvre refusée : aucune période de surveillance '
                 'valide n’est attribuée à ce poste.';
             break;
           default:
@@ -443,7 +444,13 @@ class _SauveteurActionsRapidesPageState
     }
   }
 
-  Future<void> _persistFlagState() async {
+  // L'état public et le drapeau dessiné ne changent qu'après confirmation.
+  Future<void> _persistFlagState({
+    String? requestedColor,
+    String? requestedPosition,
+    bool? requestedPurpleFlagActive,
+    bool? requestedWindsockActive,
+  }) async {
     if (_flagWriteInProgress) return;
     if (!widget.isSphotOn || !_liveFlagLoaded) {
       setState(() {
@@ -455,57 +462,62 @@ class _SauveteurActionsRapidesPageState
       return;
     }
 
-    if (flagColor == _confirmedFlagColor &&
-        flagPosition == _confirmedFlagPosition &&
-        purpleFlagActive == _confirmedPurpleFlagActive &&
-        windsockActive == _confirmedWindsockActive) {
+    final nextColor = requestedColor ?? _confirmedFlagColor;
+    final nextPosition = requestedPosition ?? _confirmedFlagPosition;
+    final nextPurple = requestedPurpleFlagActive ?? _confirmedPurpleFlagActive;
+    final nextWindsock = requestedWindsockActive ?? _confirmedWindsockActive;
+
+    if (nextColor == _confirmedFlagColor &&
+        nextPosition == _confirmedFlagPosition &&
+        nextPurple == _confirmedPurpleFlagActive &&
+        nextWindsock == _confirmedWindsockActive) {
       return;
     }
 
-    final currentStatus = flagPosition == 'Affalé'
+    final nextStatus = nextPosition == 'Affalé'
         ? 'Baignade non surveillée temporairement'
-        : _statusForFlagColor(flagColor);
+        : _statusForFlagColor(nextColor);
 
     setState(() => _flagWriteInProgress = true);
     final saved = await _persistLiveChanges({
       'liveFlag': {
-        'flagColor': _flagColorValue(flagColor),
-        'flagPosition': _flagPositionValue(flagPosition),
-        'purpleFlagActive': purpleFlagActive,
-        'windsockActive': windsockActive,
+        'flagColor': _flagColorValue(nextColor),
+        'flagPosition': _flagPositionValue(nextPosition),
+        'purpleFlagActive': nextPurple,
+        'windsockActive': nextWindsock,
       },
-      'statutBaignade': currentStatus,
+      'statutBaignade': nextStatus,
     });
 
     if (!mounted) return;
     setState(() {
       _flagWriteInProgress = false;
       if (saved) {
-        // Le serveur vient de confirmer une écriture sur ce poste.
-        _confirmedFlagColor = flagColor;
-        _confirmedFlagPosition = flagPosition;
-        _confirmedPurpleFlagActive = purpleFlagActive;
-        _confirmedWindsockActive = windsockActive;
-      } else {
-        _restoreConfirmedFlagState();
+        _confirmedFlagColor = nextColor;
+        _confirmedFlagPosition = nextPosition;
+        _confirmedPurpleFlagActive = nextPurple;
+        _confirmedWindsockActive = nextWindsock;
       }
+      _restoreConfirmedFlagState();
     });
   }
 
   Future<void> _togglePurpleFlag() async {
     if (_flagWriteInProgress) return;
-    setState(() => purpleFlagActive = !purpleFlagActive);
-    await _persistFlagState();
+    await _persistFlagState(
+      requestedPurpleFlagActive: !_confirmedPurpleFlagActive,
+    );
   }
 
   Future<void> _toggleWindsock() async {
     if (_flagWriteInProgress) return;
-    setState(() => windsockActive = !windsockActive);
-    await _persistFlagState();
+    await _persistFlagState(
+      requestedWindsockActive: !_confirmedWindsockActive,
+    );
   }
 
   Future<void> _changeFlagColor(String color) async {
-    if (color == flagColor || _flagWriteInProgress) return;
+    if (color == _confirmedFlagColor || _flagWriteInProgress) return;
     if (!_canChangeFlagColor) {
       setState(() {
         _liveStatusMessage = !_liveFlagLoaded
@@ -514,8 +526,7 @@ class _SauveteurActionsRapidesPageState
       });
       return;
     }
-    setState(() => flagColor = color);
-    await _persistFlagState();
+    await _persistFlagState(requestedColor: color);
   }
 
   Future<void> updateFlagPosition(String position) async {
@@ -529,30 +540,15 @@ class _SauveteurActionsRapidesPageState
       });
       return;
     }
-    if (position == _confirmedFlagPosition) {
-      setState(_restoreConfirmedFlagState);
-      return;
-    }
-    setState(() {
-      flagPosition = position;
-      status = position == 'Affalé'
-          ? 'Baignade non surveillée temporairement'
-          : _statusForFlagColor(flagColor);
-    });
-    await _persistFlagState();
+    await _persistFlagState(requestedPosition: position);
   }
 
   void _previewFlagPosition(String position) {
-    if (_flagWriteInProgress || !_liveFlagLoaded ||
-        !widget.isSphotOn || flagPosition == position) {
+    if (_flagWriteInProgress || !_liveFlagLoaded || !widget.isSphotOn) {
       return;
     }
-    setState(() {
-      flagPosition = position;
-      status = position == 'Affalé'
-          ? 'Baignade non surveillée temporairement'
-          : _statusForFlagColor(flagColor);
-    });
+    // Le geste mémorise la position demandée sans simuler le hissage.
+    _dragRequestedFlagPosition = position;
   }
 
   SpotFlagState _previewSpotState() {
@@ -742,12 +738,14 @@ class _SauveteurActionsRapidesPageState
               _previewFlagPosition(next);
             },
             onVerticalDragEnd: (_) {
-              unawaited(_persistFlagState());
+              final requested = _dragRequestedFlagPosition;
+              _dragRequestedFlagPosition = null;
+              if (requested != null) {
+                unawaited(updateFlagPosition(requested));
+              }
             },
             onVerticalDragCancel: () {
-              if (mounted && !_flagWriteInProgress) {
-                setState(_restoreConfirmedFlagState);
-              }
+              _dragRequestedFlagPosition = null;
             },
             child: Stack(
               alignment: Alignment.center,

@@ -31,6 +31,9 @@ void main() {
     expect(source.contains("case 'surveillance_closed':"), isTrue);
     expect(source.contains("case 'surveillance_schedule_missing':"), isTrue);
     expect(source.contains('onVerticalDragCancel:'), isTrue);
+    expect(source.contains('requestedPosition: position'), isTrue);
+    expect(source.contains('_dragRequestedFlagPosition = position;'), isTrue);
+    expect(source.contains('_restoreConfirmedFlagState();'), isTrue);
     expect(source.contains('if (_flagWriteInProgress) return;'), isTrue);
   });
 
@@ -42,6 +45,15 @@ void main() {
     expect(source.contains('sauveteurVerificationAuthor('), isTrue);
     expect(source.contains(r'Auteur : $author'), isTrue);
     expect(source.contains(r'Saisi par : $role'), isFalse);
+  });
+
+  test('Les saisies Drapeau peuvent être retirées sans changer les vérifications', () {
+    final source =
+        File('lib/pages/sauveteur/sauveteur_main_courante.dart')
+            .readAsStringSync();
+    expect(source.contains('_canDeleteFlagEntry(entry)'), isTrue);
+    expect(source.contains('...materialVerificationGroups.map('), isTrue);
+    expect(source.contains('...chronologicalEntries.map(_entryCard)'), isTrue);
   });
 
   test('Les périodes Admin sont liées par identifiant stable au poste', () {

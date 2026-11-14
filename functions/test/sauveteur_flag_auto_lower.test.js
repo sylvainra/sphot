@@ -19,11 +19,17 @@ const period = {
  * @param {Object} options Options.
  * @return {Object} Base factice et écritures enregistrées.
  */
-function fixture({now, rootPosition = "hisse", currentPosition = null} = {}) {
+function fixture({
+  now, rootPosition = "hisse", currentPosition = null,
+  purple = false, windsock = false,
+} = {}) {
   const writes = [];
   const spotData = {
     territoireId: "fr-test",
-    liveFlag: {flagColor: "green", flagPosition: rootPosition},
+    liveFlag: {
+      flagColor: "green", flagPosition: rootPosition,
+      purpleFlagActive: purple, windsockActive: windsock,
+    },
   };
   const rootRef = {kind: "root"};
   const territorySpotRef = {
@@ -44,14 +50,21 @@ function fixture({now, rootPosition = "hisse", currentPosition = null} = {}) {
     collection: (name) => {
       if (name === "spots") {
         return {
-          where: () => ({
+          where: (field, operator, value) => ({
             orderBy: () => ({
               limit: () => ({
-                get: async () => ({
-                  empty: false,
-                  size: 1,
-                  docs: [{id: "9", ref: rootRef, data: () => spotData}],
-                }),
+                get: async () => {
+                  const key = field.split(".").pop();
+                  const current = spotData.liveFlag[key];
+                  const found = operator === "in" ?
+                    value.includes(current) : current === value;
+                  return {
+                    empty: !found,
+                    size: found ? 1 : 0,
+                    docs: found ?
+                      [{id: "9", ref: rootRef, data: () => spotData}] : [],
+                  };
+                },
               }),
             }),
           }),
@@ -76,8 +89,11 @@ function fixture({now, rootPosition = "hisse", currentPosition = null} = {}) {
         get: async (ref) => {
           if (ref === rootRef) {
             return {data: () => ({
-              liveFlag: {flagColor: "green",
-                flagPosition: currentPosition || rootPosition},
+              liveFlag: {
+                flagColor: "green",
+                flagPosition: currentPosition || rootPosition,
+                purpleFlagActive: purple, windsockActive: windsock,
+              },
             })};
           }
           return ref.get();
@@ -104,6 +120,8 @@ test("affalage automatique à la fermeture : état, auteur, audit", async () => 
   assert.equal(ctx.writes.length, 3);
   const values = ctx.writes.map((write) => write.data);
   assert.equal(values[0].liveFlag.flagPosition, "affale");
+  assert.equal(values[0].liveFlag.purpleFlagActive, false);
+  assert.equal(values[0].liveFlag.windsockActive, false);
   assert.equal(values[1].type, "Drapeau");
   assert.equal(values[1].createdBy.role, "SYSTÈME");
   assert.equal(values[1].source, "automatic_surveillance_closure");
@@ -141,3 +159,31 @@ test("fonction planifiée distincte, sans imitation de sauveteur", () => {
   assert.match(closure, /transaction\.set\(candidate\.ref/);
   assert.match(closure, /Ne constitue pas une constatation/);
 });
+
+test("fermeture : coupe violet et manche à air avec drapeau affalé",
+    async () => {
+      const ctx = fixture({
+        now: new Date("2026-11-13T18:00:00Z"),
+        rootPosition: "affale", purple: true, windsock: true,
+      });
+      const result = await autoLowerClosedFlags(ctx.db, ctx.admin, ctx.now);
+      assert.equal(result.errors, 0);
+      assert.equal(result.lowered, 1);
+      assert.equal(result.inspected, 1);
+      assert.equal(ctx.writes[0].data.liveFlag.flagPosition, "affale");
+      assert.equal(ctx.writes[0].data.liveFlag.purpleFlagActive, false);
+      assert.equal(ctx.writes[0].data.liveFlag.windsockActive, false);
+      assert.match(ctx.writes[1].data.description, /Drapeau violet/);
+      assert.match(ctx.writes[1].data.description, /Manche à air/);
+    });
+
+test("ne désactive pas les signaux complémentaires avant la fermeture",
+    async () => {
+      const ctx = fixture({
+        now: new Date("2026-11-13T17:59:00Z"),
+        rootPosition: "affale", windsock: true,
+      });
+      const result = await autoLowerClosedFlags(ctx.db, ctx.admin, ctx.now);
+      assert.equal(result.lowered, 0);
+      assert.equal(ctx.writes.length, 0);
+    });

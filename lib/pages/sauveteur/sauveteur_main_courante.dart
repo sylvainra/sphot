@@ -148,6 +148,12 @@ class _SauveteurMainCourantePageState
 
   bool get _canWrite => _isSphotOn && _isSupervisor;
 
+  // Les événements Drapeau sont supprimables par un sauveteur affecté ;
+  // l'original reste conservé dans l'audit côté serveur.
+  bool _canDeleteFlagEntry(Map<String, dynamic> entry) =>
+      _isSphotOn &&
+      (entry['type'] ?? '').toString().trim().toLowerCase() == 'drapeau';
+
   DateTime get _today {
     final now = DateTime.now();
     return DateTime(now.year, now.month, now.day);
@@ -2026,7 +2032,10 @@ class _SauveteurMainCourantePageState
   }
 
   Future<void> _deleteEntry(Map<String, dynamic> entry) async {
-    if (!_canWrite || _entryMutationInProgress) return;
+    if ((!_canWrite && !_canDeleteFlagEntry(entry)) ||
+        _entryMutationInProgress) {
+      return;
+    }
 
     final entryId = (entry['id'] ?? '').toString().trim();
     if (entryId.isEmpty) return;
@@ -3265,15 +3274,16 @@ class _SauveteurMainCourantePageState
                     ),
                   ),
                 ],
-                if (_canWrite) ...[
+                if (_canWrite || _canDeleteFlagEntry(entry)) ...[
                   const SizedBox(height: 4),
                   Align(
                     alignment: Alignment.centerRight,
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        IconButton(
-                          tooltip: 'Modifier',
+                        if (_canWrite)
+                          IconButton(
+                            tooltip: 'Modifier',
                           visualDensity: VisualDensity.compact,
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(

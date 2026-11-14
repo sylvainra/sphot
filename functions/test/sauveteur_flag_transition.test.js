@@ -70,7 +70,10 @@ test("signaux additionnels n'altèrent pas la couleur enregistrée", () => {
       {flagColor: "red", flagPosition: "hisse", purpleFlagActive: true},
   );
   assert.equal(transition.error, undefined);
-  assert.deepEqual(transition.journalLines, []);
+  assert.deepEqual(transition.journalLines, [
+    "Drapeau violet : Activé",
+  ]);
+  assert.equal(transition.requiresOpenSurveillance, true);
 });
 
 test("première initialisation exige le drapeau affalé", () => {
@@ -117,4 +120,53 @@ test("transaction atomique, auteur et droits restent présents", () => {
   assert.match(handler, /transaction\.set\(auditReference/);
   assert.match(handler, /login: session\.login/);
   assert.match(handler, /flag_color_requires_lowered/);
+});
+
+test("toutes les manœuvres manuelles exigent des horaires ouverts", () => {
+  const state = {
+    flagColor: "green", flagPosition: "affale",
+    purpleFlagActive: false, windsockActive: false,
+  };
+  const changes = [
+    {...state, flagColor: "yellow"},
+    {...state, flagPosition: "hisse"},
+    {...state, purpleFlagActive: true},
+    {...state, windsockActive: true},
+  ];
+  for (const next of changes) {
+    assert.equal(
+        evaluateFlagTransition(state, next).requiresOpenSurveillance, true,
+    );
+  }
+  const hissed = {...state, flagPosition: "hisse"};
+  assert.equal(evaluateFlagTransition(hissed, state)
+      .requiresOpenSurveillance, true);
+  assert.equal(evaluateFlagTransition(state, state)
+      .requiresOpenSurveillance, false);
+});
+
+test("désactivation violette et manche à air autorisée hors horaires", () => {
+  const prior = {
+    flagColor: "yellow", flagPosition: "affale",
+    purpleFlagActive: true, windsockActive: true,
+  };
+  const after = {
+    ...prior, purpleFlagActive: false, windsockActive: false,
+  };
+  const transition = evaluateFlagTransition(prior, after);
+  assert.equal(transition.requiresOpenSurveillance, false);
+  assert.deepEqual(transition.journalLines, [
+    "Drapeau violet : Désactivé",
+    "Manche à air : Désactivée",
+  ]);
+});
+
+test("le serveur vérifie les horaires pour toute manœuvre active", () => {
+  const source = fs.readFileSync(
+      path.join(__dirname, "../index.js"), "utf8",
+  );
+  const handler = source.split("exports.updateSauveteurLiveState =")[1]
+      .split("exports.")[0];
+  assert.match(handler, /flagTransition\.requiresOpenSurveillance/);
+  assert.match(handler, /surveillanceWindow\(/);
 });

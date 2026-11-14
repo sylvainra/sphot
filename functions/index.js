@@ -7494,15 +7494,13 @@ exports.updateSauveteurLiveState = onRequest(
           }
 
           let territorySpot = {};
-          if (flagTransition &&
-              (flagTransition.flagWasRaised ||
-               flagTransition.flagWasLowered)) {
+          if (flagTransition && flagTransition.requiresOpenSurveillance) {
             const territorySpotSnapshot =
               await transaction.get(territoireSpotReference);
             territorySpot = territorySpotSnapshot.data() || {};
           }
 
-          if (flagTransition && flagTransition.flagWasRaised) {
+          if (flagTransition && flagTransition.requiresOpenSurveillance) {
             const periodsSnapshot = await transaction.get(
                 db.collection("territoires")
                     .doc(context.territoireId)
@@ -12180,14 +12178,6 @@ exports.deleteSauveteurMainCouranteEntry = onRequest(
           return;
         }
 
-        if (!context.canManageRestrictedOperationalData) {
-          response.status(403).json({
-            success: false,
-            error: "insufficient_role",
-          });
-          return;
-        }
-
         if (!entryId) {
           response.status(400).json({
             success: false,
@@ -12209,6 +12199,19 @@ exports.deleteSauveteurMainCouranteEntry = onRequest(
           response.status(404).json({
             success: false,
             error: "entry_not_found",
+          });
+          return;
+        }
+
+        // Les sauveteurs affectés peuvent retirer les saisies de drapeau.
+        // Les autres événements conservent le droit de supervision existant.
+        const entryData = entrySnapshot.data() || {};
+        const isFlagEntry = (entryData.type || "").toString()
+            .trim().toLowerCase() === "drapeau";
+        if (!context.canManageRestrictedOperationalData && !isFlagEntry) {
+          response.status(403).json({
+            success: false,
+            error: "insufficient_role",
           });
           return;
         }
