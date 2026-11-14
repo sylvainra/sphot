@@ -115,7 +115,8 @@ test("transaction atomique, auteur et droits restent présents", () => {
   assert.match(handler, /context\.sphotMode !== "ON"/);
   assert.match(handler, /context\.realtimeSpotIds\.includes\(spotId\)/);
   assert.match(handler, /db\.runTransaction\(/);
-  assert.match(handler, /evaluateFlagTransition\(previousLiveFlag/);
+  assert.match(handler, /evaluateFlagTransition\(/);
+  assert.match(handler, /previousEffectiveFlag/);
   assert.match(handler, /transaction\.set\(mainCouranteReference/);
   assert.match(handler, /transaction\.set\(auditReference/);
   assert.match(handler, /login: session\.login/);
