@@ -1,7 +1,7 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {surveillanceWindow, localClock} =
+const {surveillanceWindow, surveillanceWindowForSauveteurs, localClock} =
   require("../sauveteur_surveillance_schedule");
 
 const period = {
@@ -137,3 +137,149 @@ test("aucune période = aucune ouverture présumée", () => {
   assert.equal(window.open, false);
   assert.equal(window.configured, false);
 });
+
+test("LONGE 09 : l'affectation B SLSM autorise le hissage à 16h56",
+    () => {
+      const actualPeriod = {
+        ...period,
+        id: "1781295018284",
+        startDate: new Date("2026-06-11T22:00:00.000Z"),
+        endDate: new Date("2026-11-29T23:00:00.000Z"),
+      };
+      const assigned = [{
+        periodesSurveillance: ["1781295018284"],
+        postesAffectes: ["9", "13"],
+      }];
+      const at1656 = surveillanceWindowForSauveteurs(
+          assigned, [actualPeriod], new Date("2026-11-14T15:56:14.536Z"));
+      assert.equal(at1656.open, true);
+      assert.equal(at1656.configured, true);
+      assert.equal(at1656.matchedPeriods.length, 1);
+      assert.equal(at1656.closesAt.toISOString(), "2026-11-14T18:00:00.000Z");
+
+      const beforeOpening = surveillanceWindowForSauveteurs(
+          assigned, [actualPeriod], new Date("2026-11-14T09:59:00Z"));
+      assert.equal(beforeOpening.open, false);
+      const atClosing = surveillanceWindowForSauveteurs(
+          assigned, [actualPeriod], new Date("2026-11-14T18:00:00Z"));
+      assert.equal(atClosing.open, false);
+      const noRescuers = surveillanceWindowForSauveteurs(
+          [], [actualPeriod], new Date("2026-11-14T15:56:14.536Z"));
+      assert.equal(noRescuers.open, false);
+    });
+test("plusieurs sauveteurs avec plusieurs périodes : union des créneaux",
+    () => {
+      const november = {
+        ...period,
+        id: "novembre",
+        startHour: "11:00",
+        endHour: "19:00",
+      };
+      const december = {
+        ...period,
+        id: "decembre",
+        startDate: new Date("2026-11-30T23:00:00Z"),
+        endDate: new Date("2026-12-30T23:00:00Z"),
+        startHour: "09:00",
+        endHour: "17:00",
+      };
+      const sauveteurs = [
+        {periodesSurveillance: ["novembre"]},
+        {periodesSurveillance: ["decembre", "novembre"]},
+        {periodesSurveillance: ["novembre"]},
+      ];
+      const inNovember = surveillanceWindowForSauveteurs(
+          sauveteurs, [november, december],
+          new Date("2026-11-14T15:56:14.536Z"));
+      assert.equal(inNovember.open, true);
+      assert.equal(inNovember.matchedPeriods.length, 2);
+      const inDecember = surveillanceWindowForSauveteurs(
+          sauveteurs, [november, december],
+          new Date("2026-12-14T11:00:00Z"));
+      assert.equal(inDecember.open, true);
+      assert.equal(inDecember.matchedPeriods.length, 2);
+    });
+
+test("deux plages horaires : fermeture midi puis nouvelle ouverture",
+    () => {
+      const twoSlots = {
+        ...period,
+        id: "deux-plages",
+        startHour: "09:00", endHour: "12:00",
+        secondStartHour: "14:00", secondEndHour: "18:00",
+      };
+      const rescuers = [{periodesSurveillance: ["deux-plages"]}];
+      const check = (iso) => surveillanceWindowForSauveteurs(
+          rescuers, [twoSlots], new Date(iso));
+      assert.equal(check("2026-11-14T10:59:00Z").open, true);
+      assert.equal(check("2026-11-14T11:00:00Z").open, false);
+      assert.equal(check("2026-11-14T12:59:00Z").open, false);
+      assert.equal(check("2026-11-14T13:00:00Z").open, true);
+      assert.equal(check("2026-11-14T16:59:00Z").open, true);
+      assert.equal(check("2026-11-14T17:00:00Z").open, false);
+      assert.equal(check("2026-11-14T13:00:00Z")
+          .closesAt.toISOString(), "2026-11-14T17:00:00.000Z");
+    });
+
+test("modification d'un sauveteur : la période retirée n'ouvre plus",
+    () => {
+      const actual = {...period, id: "1781295018284"};
+      const instant = new Date("2026-11-14T15:56:14.536Z");
+      const before = [{periodesSurveillance: ["1781295018284"]}];
+      const after = [{periodesSurveillance: ["ancienne-periode"]}];
+      assert.equal(surveillanceWindowForSauveteurs(
+          before, [actual], instant).open, true);
+      assert.equal(surveillanceWindowForSauveteurs(
+          after, [actual], instant).open, false);
+      assert.equal(surveillanceWindowForSauveteurs(
+          [], [actual], instant).open, false);
+    });
+
+test("modification des heures d'une période : effet immédiat",
+    () => {
+      const assigned = [{periodesSurveillance: ["été-2026"]}];
+      const now = new Date("2026-11-14T15:56:14.536Z");
+      assert.equal(surveillanceWindowForSauveteurs(
+          assigned, [period], now).open, true);
+      assert.equal(surveillanceWindowForSauveteurs(
+          assigned, [{...period, endHour: "16:00"}], now).open, false);
+    });
+test("pause mÃ©ridienne supprimÃ©e : une " +
+    "ancienne plage rÃ©siduelle est ignorÃ©e",
+() => {
+  const noBreak = {
+    ...period, id: "sans-pause", hasMiddayBreak: false,
+    startHour: "09:00", endHour: "12:00",
+    secondStartHour: "14:00", secondEndHour: "18:00",
+  };
+  const sauveteurs = [{periodesSurveillance: ["sans-pause"]}];
+  const atMorning = surveillanceWindowForSauveteurs(
+      sauveteurs, [noBreak], new Date("2026-11-14T10:00:00Z"));
+  const atAfternoon = surveillanceWindowForSauveteurs(
+      sauveteurs, [noBreak], new Date("2026-11-14T14:00:00Z"));
+  assert.equal(atMorning.open, true);
+  assert.equal(atAfternoon.open, false);
+});
+
+test("crÃ©ation et modification : plusieurs sauveteurs, pÃ©riodes et horaires",
+    () => {
+      const morning = {
+        ...period, id: "matin", startHour: "09:00", endHour: "12:00",
+      };
+      const afternoon = {
+        ...period, id: "apres-midi", startHour: "14:00", endHour: "19:00",
+      };
+      const at = (sauveteurs, iso) => surveillanceWindowForSauveteurs(
+          sauveteurs, [morning, afternoon], new Date(iso));
+      const sauveteurA = {periodesSurveillance: ["matin"]};
+      const sauveteurB = {periodesSurveillance: ["apres-midi"]};
+      assert.equal(at([sauveteurA, sauveteurB],
+          "2026-11-14T10:00:00Z").open, true);
+      assert.equal(at([sauveteurA, sauveteurB],
+          "2026-11-14T12:00:00Z").open, false);
+      assert.equal(at([sauveteurA, sauveteurB],
+          "2026-11-14T15:56:00Z").open, true);
+      assert.equal(at([sauveteurA],
+          "2026-11-14T15:56:00Z").open, false);
+      assert.equal(at([], "2026-11-14T10:00:00Z").open, false);
+    });

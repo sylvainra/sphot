@@ -253,8 +253,38 @@ test("le serveur vérifie les horaires pour toute manœuvre active", () => {
   const handler = source.split("exports.updateSauveteurLiveState =")[1]
       .split("exports.")[0];
   assert.match(handler, /if \(flagTransition\)/);
-  assert.match(handler, /surveillanceWindow\(/);
+  assert.match(handler, /surveillanceWindowForSauveteurs\(/);
   assert.match(handler, /if \(!schedule\.open\)/);
   assert.match(handler, /preparedFlag/);
   assert.match(handler, /"flag_preparation"/);
+});
+
+test("preparation consommee : audit sans sentinelle Firestore", () => {
+  const source = fs.readFileSync(
+      path.join(__dirname, "../index.js"), "utf8");
+  const handler = source.split("exports.updateSauveteurLiveState =")[1]
+      .split("exports.")[0];
+  const start = handler.indexOf(
+      "const auditChanges = {...sanitizedChanges};");
+  const end = handler.indexOf("transaction.set(auditReference, {", start);
+  assert.ok(start >= 0 && end > start);
+  const snippet = handler.slice(start, end);
+  const vm = require("node:vm");
+  const sentinel = {firestoreOperation: "DELETE"};
+  const original = {liveFlag: {flagPosition: "hisse"},
+    preparedFlag: sentinel};
+  const context = {sanitizedChanges: original,
+    previousPreparedFlag: {pending: true}, flagTransition: {}};
+  const audit = vm.runInNewContext(snippet + "\nauditChanges", context);
+  assert.equal(audit.preparedFlag, undefined);
+  assert.equal(audit.preparedFlagConsumed, true);
+  assert.equal(audit.liveFlag.flagPosition, "hisse");
+  assert.equal(original.preparedFlag, sentinel);
+  const withoutPrep = vm.runInNewContext(snippet + "\nauditChanges", {
+    sanitizedChanges: {liveFlag: {flagPosition: "hisse"}},
+    previousPreparedFlag: null, flagTransition: {},
+  });
+  assert.equal(withoutPrep.preparedFlagConsumed, undefined);
+  assert.match(handler, /changes: auditChanges,/);
+  assert.doesNotMatch(handler, /changes: sanitizedChanges,/);
 });

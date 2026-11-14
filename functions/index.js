@@ -1,6 +1,7 @@
 const {sendSphotMail} = require("./sphot_email_design");
 const {evaluateFlagTransition} = require("./sauveteur_flag_transition");
-const {surveillanceWindow} = require("./sauveteur_surveillance_schedule");
+const {surveillanceWindowForSauveteurs} =
+  require("./sauveteur_surveillance_schedule");
 const {autoLowerClosedFlags} = require("./sauveteur_flag_auto_lower");
 const {shouldRejectSauveteurBrowserLogin} =
     require("./sauveteur_web_access");
@@ -7532,9 +7533,15 @@ exports.updateSauveteurLiveState = onRequest(
               id: period.id,
               ...period.data(),
             }));
+            // Même source de vérité que le portail SPHOT Admin :
+            // les périodes des sauveteurs affectés à ce poste.
+            const assignedSnapshot = await transaction.get(
+                territoireSpotReference.collection("sauveteursAffectes"),
+            );
             const now = new Date();
-            const schedule = surveillanceWindow(
-                territorySpot, periods, now,
+            const schedule = surveillanceWindowForSauveteurs(
+                assignedSnapshot.docs.map((doc) => doc.data() || {}),
+                periods, now, territorySpot.timeZone,
             );
 
             if (!schedule.open) {
@@ -7547,11 +7554,7 @@ exports.updateSauveteurLiveState = onRequest(
                   "surveillance_closed" : "surveillance_schedule_missing");
                 denied.httpStatus = 409;
                 denied.serverTimeUtc = now.toISOString();
-                denied.periods = periods.filter((period) =>
-                  (territorySpot.periodesSurveillanceIds || [])
-                      .includes(period.id) ||
-                  (territorySpot.periodesSurveillance || [])
-                      .includes(period.label)).map((period) => ({
+                denied.periods = schedule.matchedPeriods.map((period) => ({
                   startHour: period.startHour,
                   endHour: period.endHour,
                   timeZone: period.timeZone || "Europe/Paris",
@@ -7680,13 +7683,20 @@ exports.updateSauveteurLiveState = onRequest(
             liveUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
             updatedBySauveteurId: context.sauveteurId,
           }, {merge: true});
+          // Une sentinelle delete() doit rester au niveau racine de
+          // l'ecriture du SPHOT ; elle ne peut jamais figurer dans changes.
+          const auditChanges = {...sanitizedChanges};
+          if (previousPreparedFlag && flagTransition) {
+            delete auditChanges.preparedFlag;
+            auditChanges.preparedFlagConsumed = true;
+          }
           transaction.set(auditReference, {
             territoireId: context.territoireId,
             spotId,
             sauveteurId: context.sauveteurId,
             login: session.login,
             role: context.userRole,
-            changes: sanitizedChanges,
+            changes: auditChanges,
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
           });
 

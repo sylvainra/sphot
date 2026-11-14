@@ -1,6 +1,7 @@
 "use strict";
 
-const {surveillanceWindow} = require("./sauveteur_surveillance_schedule");
+const {surveillanceWindowForSauveteurs} =
+  require("./sauveteur_surveillance_schedule");
 
 const HISSE_VALUES = ["hisse", "hissé", "Hissé", "Hisse"];
 
@@ -57,16 +58,19 @@ async function autoLowerClosedFlags(firestore, admin, now = new Date()) {
         const territorySpotRef = territory.collection("spots")
             .doc(candidate.id);
         const periodsRef = territory.collection("periodesSurveillance");
+        const assignedRef = territorySpotRef.collection("sauveteursAffectes");
 
         try {
-          const [spotSnapshot, periodsSnapshot] = await Promise.all([
-            territorySpotRef.get(), periodsRef.get(),
-          ]);
+          const [spotSnapshot, periodsSnapshot, assignedSnapshot] =
+            await Promise.all([
+              territorySpotRef.get(), periodsRef.get(), assignedRef.get(),
+            ]);
           const periods = periodsSnapshot.docs.map((doc) => ({
             id: doc.id, ...doc.data(),
           }));
-          const preview = surveillanceWindow(
-              spotSnapshot.data() || {}, periods, now,
+          const preview = surveillanceWindowForSauveteurs(
+              assignedSnapshot.docs.map((doc) => doc.data() || {}),
+              periods, now, (spotSnapshot.data() || {}).timeZone,
           );
           if (preview.open && root.preparedFlag?.pending !== true) {
             statistics.skipped++;
@@ -79,6 +83,7 @@ async function autoLowerClosedFlags(firestore, admin, now = new Date()) {
             const rootSnapshot = await transaction.get(candidate.ref);
             const freshSpot = await transaction.get(territorySpotRef);
             const freshPeriods = await transaction.get(periodsRef);
+            const freshAssigned = await transaction.get(assignedRef);
             const rootData = rootSnapshot.data() || {};
             const live = rootData.liveFlag || {};
             const prepared = rootData.preparedFlag || {};
@@ -88,10 +93,10 @@ async function autoLowerClosedFlags(firestore, admin, now = new Date()) {
             const purple = live.purpleFlagActive === true;
             const windsock = live.windsockActive === true;
 
-            const currentPeriod = surveillanceWindow(
-                freshSpot.data() || {},
+            const currentPeriod = surveillanceWindowForSauveteurs(
+                freshAssigned.docs.map((doc) => doc.data() || {}),
                 freshPeriods.docs.map((doc) => ({id: doc.id, ...doc.data()})),
-                now,
+                now, (freshSpot.data() || {}).timeZone,
             );
             if (currentPeriod.open && prepared.pending === true) {
               const time = admin.firestore.FieldValue.serverTimestamp();

@@ -102,9 +102,14 @@ function surveillanceWindow(spot, periods, now = new Date()) {
 
     const timeZone = (period.timeZone || spot.timeZone ||
       DEFAULT_LEGACY_TIME_ZONE).toString();
-    const start = minutes(period.startHour);
-    const end = minutes(period.endHour);
-    if (start === null || end === null || end <= start) continue;
+    const windows = [
+      [minutes(period.startHour), minutes(period.endHour)],
+      ...(period.hasMiddayBreak === false ? [] : [
+        [minutes(period.secondStartHour), minutes(period.secondEndHour)],
+      ]),
+    ].filter(([start, end]) =>
+      start !== null && end !== null && end > start);
+    if (windows.length === 0) continue;
 
     const startDate = period.startDate &&
       typeof period.startDate.toDate === "function" ?
@@ -125,20 +130,22 @@ function surveillanceWindow(spot, periods, now = new Date()) {
           dateCode(today) > dateCode(endDay)) continue;
 
       const minuteOfDay = today.hour * 60 + today.minute;
-      if (minuteOfDay < start || minuteOfDay >= end) continue;
+      for (const [start, end] of windows) {
+        if (minuteOfDay < start || minuteOfDay >= end) continue;
 
-      const closingTime = localToInstant({
-        year: today.year,
-        month: today.month,
-        day: today.day,
-        hour: Math.floor(end / 60),
-        minute: end % 60,
-      }, timeZone);
-      if (!closingTime) continue;
+        const closingTime = localToInstant({
+          year: today.year,
+          month: today.month,
+          day: today.day,
+          hour: Math.floor(end / 60),
+          minute: end % 60,
+        }, timeZone);
+        if (!closingTime) continue;
 
-      open = true;
-      if (!closesAt || closingTime.getTime() > closesAt.getTime()) {
-        closesAt = closingTime;
+        open = true;
+        if (!closesAt || closingTime.getTime() > closesAt.getTime()) {
+          closesAt = closingTime;
+        }
       }
     } catch (_) {
       // Fuseau invalide : ne pas autoriser une ouverture implicite.
@@ -148,8 +155,46 @@ function surveillanceWindow(spot, periods, now = new Date()) {
   return {configured, open, closesAt};
 }
 
+/**
+ * Calcule les horaires du poste à partir des périodes des sauveteurs
+ * réellement affectés. Aucun champ de période historique du poste n'est lu.
+ * Une absence d'affectation ferme le créneau par sécurité.
+ *
+ * @param {Array<Object>} assignedSauveteurs Documents sauveteursAffectes.
+ * @param {Array<Object>} periods Périodes de la commune.
+ * @param {Date} now Instant courant.
+ * @param {string} timeZone Fuseau légal du poste.
+ * @return {Object} Créneau et périodes associées pour le diagnostic.
+ */
+function surveillanceWindowForSauveteurs(
+    assignedSauveteurs, periods, now = new Date(),
+    timeZone = DEFAULT_LEGACY_TIME_ZONE) {
+  const references = new Set();
+  for (const sauveteur of assignedSauveteurs) {
+    const values = sauveteur && sauveteur.periodesSurveillance;
+    if (!Array.isArray(values)) continue;
+    for (const value of values) {
+      const reference = (value ?? "").toString().trim();
+      if (reference) references.add(reference);
+    }
+  }
+  const assigned = [...references];
+  const schedule = surveillanceWindow({
+    periodesSurveillanceIds: assigned,
+    periodesSurveillance: assigned,
+    timeZone: timeZone || DEFAULT_LEGACY_TIME_ZONE,
+  }, periods, now);
+  const matchedPeriods = periods.filter((period) => {
+    const id = (period.id ?? "").toString().trim();
+    const label = (period.label || period.name || "").toString().trim();
+    return references.has(id) || references.has(label);
+  });
+  return {...schedule, matchedPeriods};
+}
+
 module.exports = {
   DEFAULT_LEGACY_TIME_ZONE,
   localClock,
   surveillanceWindow,
+  surveillanceWindowForSauveteurs,
 };

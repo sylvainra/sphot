@@ -240,7 +240,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   bool _isSavingSauveteur = false;
   bool _isSubmittingSauveteur = false;
   bool _sauveteurAccessGenerated = false;
-  bool _sauveteurPasswordRegenerated = false;
+
   bool _sauveteurHasUnsavedChanges = false;
   bool _sauveteurEmailSent = false;
   String _sauveteurGeneratedLogin = '';
@@ -7664,7 +7664,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     _isSavingSauveteur = false;
     _isSubmittingSauveteur = false;
     _sauveteurAccessGenerated = false;
-    _sauveteurPasswordRegenerated = false;
     _sauveteurHasUnsavedChanges = false;
     _sauveteurEmailSent = false;
     _sauveteurGeneratedLogin = '';
@@ -7941,81 +7940,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
   }
 
-  Future<bool> _regenerateSauveteurPassword() async {
-    final sauveteurId = _editingSauveteurDocId?.trim() ?? '';
-    final login = _sauveteurGeneratedLogin.trim();
-
-    if (sauveteurId.isEmpty || login.isEmpty) {
-      _showSauveteurError(
-        'Impossible de retrouver l’identifiant du sauveteur.',
-      );
-      return false;
-    }
-    if (!sphotPilotAllowsSauveteur(login)) {
-      _showSauveteurError('Seul le sauveteur de test peut être modifié.');
-      return false;
-    }
-
-    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-    final random = math.Random.secure();
-    final password = List<String>.generate(
-      8,
-      (_) => chars[random.nextInt(chars.length)],
-    ).join();
-
-    setState(() {
-      _isSavingSauveteur = true;
-    });
-
-    try {
-      final sauveteurReference = FirebaseFirestore.instance
-          .collection('territoires')
-          .doc(_resolvedTerritoireId)
-          .collection('sauveteurs')
-          .doc(sauveteurId);
-
-      await sauveteurReference.set({
-        'temporaryPassword': password,
-        'mustChangePassword': true,
-        'passwordResetAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-
-      await _upsertSauveteurAccount(
-        login: login,
-        temporaryPassword: password,
-        sauveteurId: sauveteurId,
-      );
-
-      if (!mounted) {
-        return false;
-      }
-
-      setState(() {
-        _isSavingSauveteur = false;
-        _sauveteurGeneratedPassword = password;
-        _sauveteurAccessGenerated = true;
-        _sauveteurPasswordRegenerated = true;
-        _sauveteurEmailSent = false;
-      });
-
-      // L'email part seulement après la sauvegarde complète.
-      return true;
-    } catch (error) {
-      if (!mounted) {
-        return false;
-      }
-
-      setState(() {
-        _isSavingSauveteur = false;
-      });
-
-      _showSauveteurError('Régénération du mot de passe impossible : $error');
-      return false;
-    }
-  }
-
-  Future<void> _sendSauveteurCredentialsEmail({bool isReset = false}) async {
+  Future<void> _sendSauveteurCredentialsEmail() async {
     if (!_sauveteurAccessGenerated || _sauveteurEmailSent) {
       return;
     }
@@ -8044,7 +7969,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         'civilite': _sauveteurCivilite ?? '',
         'identifiant': _sauveteurGeneratedLogin,
         'motdepasse': _sauveteurGeneratedPassword,
-        'type': isReset ? 'reset' : 'creation',
+        'type': 'creation',
       }),
     );
 
@@ -8263,33 +8188,22 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             }, SetOptions(merge: true));
       }
 
-      // Ne réinitialiser le mot de passe qu'après la sauvegarde de la
-      // fiche et des affectations. Un échec de la sauvegarde ne doit
-      // jamais déconnecter prématurément le sauveteur.
-      if (isEditing && !_sauveteurPasswordRegenerated) {
-        final regenerated = await _regenerateSauveteurPassword();
-        if (!regenerated || !mounted) return;
-      }
-
-      // Envoi unique après la sauvegarde et les affectations.
-      // En cas d'échec, le prochain clic ne régénère pas les accès.
-      if (!isEditing || _sauveteurPasswordRegenerated) {
+      // Modifier la fiche, les postes ou les periodes conserve le mot de passe.
+      // Un nouvel acces n'est envoye qu'a la creation du sauveteur.
+      // La recuperation volontaire du mot de passe suit son parcours dedie.
+      if (!isEditing) {
         try {
-          await _sendSauveteurCredentialsEmail(isReset: isEditing);
+          await _sendSauveteurCredentialsEmail();
         } catch (error) {
           if (!mounted) return;
           setState(() => _isSavingSauveteur = false);
           _showSauveteurError(
-            isEditing
-                ? 'Les modifications et le nouveau mot de passe sont enregistrés, '
-                  'mais l’envoi de l’email a échoué : $error'
-                : 'Le sauveteur a bien été créé, mais l’envoi '
-                  'de l’email a échoué : $error',
+            'Le sauveteur a bien été créé, mais l’envoi '
+            'de l’email a échoué : $error',
           );
           return;
         }
       }
-
       if (!mounted) {
         return;
       }
@@ -8663,7 +8577,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       _sauveteurPeriodesSurveillance.addAll(periodes);
 
       _sauveteurGeneratedLogin = _cleanText(data['login']);
-      _sauveteurGeneratedPassword = _cleanText(data['temporaryPassword']);
+      _sauveteurGeneratedPassword = '';
       _sauveteurAccessGenerated = _sauveteurGeneratedLogin.isNotEmpty;
       _sauveteurEmailSent = true;
 

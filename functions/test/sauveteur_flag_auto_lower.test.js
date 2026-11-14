@@ -22,6 +22,8 @@ const period = {
 function fixture({
   now, rootPosition = "hisse", currentPosition = null,
   purple = false, windsock = false, prepared = null,
+  assignedPeriodIds = ["p1"],
+  assignedPeriodLists = null, periodData = period,
 } = {}) {
   const writes = [];
   const spotData = {
@@ -33,18 +35,29 @@ function fixture({
     preparedFlag: prepared ? {...prepared, pending: true} : null,
   };
   const rootRef = {kind: "root"};
+  const assignedRef = {
+    kind: "assignedSauveteurs",
+    get: async () => ({
+      docs: (assignedPeriodLists || [assignedPeriodIds])
+          .map((ids, index) => ({
+            id: `sauveteur${index}`,
+            data: () => ({periodesSurveillance: ids}),
+          })),
+    }),
+  };
   const territorySpotRef = {
     kind: "territorySpot",
     get: async () => ({data: () => ({
       nomSecours: "LONGE 09",
-      periodesSurveillance: [period.label],
+      periodesSurveillance: ["ANCIENNE PÉRIODE PÉRIMÉE"],
     })}),
-    collection: () => ({doc: () => ({kind: "journal"})}),
+    collection: (name) => name === "sauveteursAffectes" ?
+      assignedRef : {doc: () => ({kind: "journal"})},
   };
   const periodsRef = {
     kind: "periods",
     get: async () => ({
-      docs: [{id: "p1", data: () => period}],
+      docs: [{id: "p1", data: () => periodData}],
     }),
   };
   const chain = {
@@ -242,5 +255,45 @@ test("une fermeture transactionnelle utilise le même instant de contrôle",
     () => {
       const source = fs.readFileSync(
           path.join(__dirname, "../sauveteur_flag_auto_lower.js"), "utf8");
-      assert.match(source, /freshPeriods\.docs\.map[\s\S]*?\n\s*now,\n/);
+      assert.match(source, /freshAssigned\.docs\.map[\s\S]*?\n\s*now,/);
+    });
+
+test("périodes du sauveteur : le poste reste fermé sans affectation",
+    async () => {
+      const ctx = fixture({
+        now: new Date("2026-11-14T15:56:14.536Z"),
+        assignedPeriodIds: [],
+      });
+      const result = await autoLowerClosedFlags(ctx.db, ctx.admin, ctx.now);
+      assert.equal(result.lowered, 1);
+      assert.equal(result.errors, 0);
+    });
+test("automatisme : respecte les deux plages et la pause du midi",
+    async () => {
+      const twoSlots = {...period, startHour: "09:00", endHour: "12:00",
+        secondStartHour: "14:00", secondEndHour: "18:00"};
+      for (const [instant, shouldLower] of [
+        ["2026-11-14T10:59:00Z", false],
+        ["2026-11-14T11:00:00Z", true],
+        ["2026-11-14T13:00:00Z", false],
+        ["2026-11-14T17:00:00Z", true],
+      ]) {
+        const ctx = fixture({now: new Date(instant), periodData: twoSlots});
+        const result = await autoLowerClosedFlags(ctx.db, ctx.admin, ctx.now);
+        assert.equal(result.errors, 0);
+        assert.equal(result.lowered, shouldLower ? 1 : 0, instant);
+      }
+    });
+
+test("automatisme : plusieurs sauveteurs, retrait d'affectation",
+    async () => {
+      const now = new Date("2026-11-14T15:56:14.536Z");
+      const present = fixture({now, assignedPeriodLists: [[], ["p1"]]});
+      const first = await autoLowerClosedFlags(present.db, present.admin, now);
+      assert.equal(first.lowered, 0);
+      assert.equal(first.errors, 0);
+      const removed = fixture({now, assignedPeriodLists: [[], []]});
+      const second = await autoLowerClosedFlags(removed.db, removed.admin, now);
+      assert.equal(second.lowered, 1);
+      assert.equal(second.errors, 0);
     });
