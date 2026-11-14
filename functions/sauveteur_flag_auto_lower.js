@@ -86,7 +86,7 @@ async function autoLowerClosedFlags(firestore, admin, now = new Date()) {
             const currentPeriod = surveillanceWindow(
                 freshSpot.data() || {},
                 freshPeriods.docs.map((doc) => ({id: doc.id, ...doc.data()})),
-                new Date(),
+                now,
             );
             if (currentPeriod.open) return null;
 

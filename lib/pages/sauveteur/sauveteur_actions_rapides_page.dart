@@ -40,12 +40,12 @@ class SauveteurActionsRapidesPage extends StatefulWidget {
 class _SauveteurActionsRapidesPageState
     extends State<SauveteurActionsRapidesPage> {
   String flagColor = 'Vert';
-  String flagPosition = 'Hissé';
-  String status = 'Baignade surveillée';
+  String flagPosition = 'Affalé';
+  String status = 'Baignade non surveillée temporairement';
 
   // Dernier état constaté sur Firestore, distinct de l'animation locale.
   String _confirmedFlagColor = 'Vert';
-  String _confirmedFlagPosition = 'Hissé';
+  String _confirmedFlagPosition = 'Affalé';
   bool _confirmedPurpleFlagActive = false;
   bool _confirmedWindsockActive = false;
   bool _liveFlagLoaded = false;
@@ -207,19 +207,20 @@ class _SauveteurActionsRapidesPageState
       _liveStatusMessage = null;
       _liveFlagLoaded = false;
       _confirmedFlagColor = 'Vert';
-      _confirmedFlagPosition = 'Hissé';
+      _confirmedFlagPosition = 'Affalé';
       _confirmedPurpleFlagActive = false;
       _confirmedWindsockActive = false;
+      _dragRequestedFlagPosition = null;
       flagColor = 'Vert';
-      flagPosition = 'Hissé';
-      status = _statusForFlagColor(flagColor);
+      flagPosition = 'Affalé';
+      status = 'Baignade non surveillée temporairement';
       purpleFlagActive = false;
       windsockActive = false;
 
       if (!widget.isSphotOn) {
         flagColor = 'Vert';
-        flagPosition = 'Hissé';
-        status = 'Baignade surveillée';
+        flagPosition = 'Affalé';
+        status = 'Baignade non surveillée temporairement';
         purpleFlagActive = false;
         windsockActive = false;
         selectedDangers.clear();

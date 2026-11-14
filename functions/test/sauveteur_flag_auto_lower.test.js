@@ -187,3 +187,10 @@ test("ne désactive pas les signaux complémentaires avant la fermeture",
       assert.equal(result.lowered, 0);
       assert.equal(ctx.writes.length, 0);
     });
+
+test("une fermeture transactionnelle utilise le même instant de contrôle",
+    () => {
+      const source = fs.readFileSync(
+          path.join(__dirname, "../sauveteur_flag_auto_lower.js"), "utf8");
+      assert.match(source, /freshPeriods\.docs\.map[\s\S]*?\n\s*now,\n/);
+    });
