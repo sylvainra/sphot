@@ -51,7 +51,8 @@ async function autoLowerClosedFlags(firestore, admin, now = new Date()) {
         }
 
         const territory = db.collection("territoires").doc(territoryId);
-        const territorySpotRef = territory.collection("spots").doc(candidate.id);
+        const territorySpotRef = territory.collection("spots")
+            .doc(candidate.id);
         const periodsRef = territory.collection("periodesSurveillance");
 
         try {
