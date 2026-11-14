@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -23,6 +24,7 @@ enum _LoginAudience {
 }
 
 class _TooManyLoginAttempts implements Exception {}
+class _SauveteurWebRestricted implements Exception {}
 
 class ProfilLoginPage extends StatefulWidget {
   const ProfilLoginPage({super.key});
@@ -249,6 +251,11 @@ class _ProfilLoginPageState extends State<ProfilLoginPage> {
       return null;
     }
 
+    if (kIsWeb && endpoint == 'loginSauveteur' &&
+        response.statusCode == 403) {
+      throw _SauveteurWebRestricted();
+    }
+
     if (response.statusCode == 429) {
       throw _TooManyLoginAttempts();
     }
@@ -383,7 +390,9 @@ class _ProfilLoginPageState extends State<ProfilLoginPage> {
       if (!mounted) return;
 
       setState(() {
-        _errorMessage = error is _TooManyLoginAttempts
+        _errorMessage = error is _SauveteurWebRestricted
+            ? 'L’accès SPHOT SAUVETEUR est réservé à l’application mobile.'
+            : error is _TooManyLoginAttempts
             ? 'Trop de tentatives de connexion. '
                 'Réessayez dans 15 minutes ou utilisez « Mot de passe oublié ? ».'
             : 'Connexion impossible. Vérifiez votre connexion internet et réessayez.';
@@ -396,6 +405,16 @@ class _ProfilLoginPageState extends State<ProfilLoginPage> {
   }
 
   Future<void> _openSauveteur(Map<String, dynamic> result) async {
+    // Seuls les parcours professionnels peuvent aboutir depuis Chrome.
+    if (kIsWeb) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage =
+            'L’accès SPHOT SAUVETEUR est réservé à l’application mobile.';
+      });
+      return;
+    }
+
     final login = _identifierController.text.trim().toLowerCase();
     final userRole = (result['userRole'] ?? 'SAUVETEUR').toString();
     final territoireId = (result['territoireId'] ?? '').toString();

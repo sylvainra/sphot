@@ -3,6 +3,19 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('Le navigateur Web ne donne pas accès au menu SAUVETEUR', () {
+    final login = File('lib/map/profil_login_page.dart')
+        .readAsStringSync();
+    final menu = File('lib/pages/sauveteur/sauveteur_menu_page.dart')
+        .readAsStringSync();
+
+    expect(login.contains('class _SauveteurWebRestricted'), isTrue);
+    expect(login.contains("endpoint == 'loginSauveteur'"), isTrue);
+    expect(login.contains('if (kIsWeb) {'), isTrue);
+    expect(menu.contains('if (kIsWeb) return;'), isTrue);
+    expect(menu.contains('if (kIsWeb) {'), isTrue);
+  });
+
   test('Le bouton couleur exige un drapeau déjà affalé et confirmé', () {
     final source =
         File('lib/pages/sauveteur/sauveteur_actions_rapides_page.dart')

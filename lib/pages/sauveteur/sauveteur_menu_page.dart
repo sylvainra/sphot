@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -112,6 +113,9 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
     _canManageRestrictedOperationalData =
         widget.canManageRestrictedOperationalData;
 
+    // Aucun chargement opérationnel depuis un navigateur Web.
+    if (kIsWeb) return;
+
     _loadAssignedSpots();
     _refreshMode();
     _modeRefreshTimer = Timer.periodic(
@@ -135,7 +139,8 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
   }
 
   Future<void> _refreshMode() async {
-    if (_refreshingMode || widget.sauveteurSessionToken.trim().isEmpty) {
+    if (kIsWeb || _refreshingMode ||
+        widget.sauveteurSessionToken.trim().isEmpty) {
       return;
     }
 
@@ -315,6 +320,17 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
 
   @override
   Widget build(BuildContext context) {
+    if (kIsWeb) {
+      return const Scaffold(
+        body: Center(
+          child: Text(
+            'L’espace SPHOT SAUVETEUR est réservé à l’application mobile.',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+
     final profileColor = widget.profileColor;
 
     return Scaffold(

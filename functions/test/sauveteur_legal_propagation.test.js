@@ -5,6 +5,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 const legalDocumentVersions = require("../legal_document_versions");
+const {shouldRejectSauveteurBrowserLogin} =
+    require("../sauveteur_web_access");
 
 // Exécute les fonctions EXACTES présentes dans functions/index.js sans
 // initialiser Firebase Admin ni déployer les fonctions métier.
@@ -100,6 +102,32 @@ test("connexion : versions individuelles chargees", () => {
   assert.match(route, acceptanceCheck);
   assert.match(source.slice(end, end + 700),
       /handleSauveteurLogin\(request, response\)/);
+});
+
+test("connexion SAUVETEUR : le navigateur est refusé, Android préservé", () => {
+  assert.equal(shouldRejectSauveteurBrowserLogin(
+      "https://sphot.app", false), true);
+  assert.equal(shouldRejectSauveteurBrowserLogin(
+      "https://sphot-ab80b.web.app", false), true);
+  assert.equal(shouldRejectSauveteurBrowserLogin(
+      "http://localhost:54321", false), true);
+  assert.equal(shouldRejectSauveteurBrowserLogin(
+      "null", false), true);
+  assert.equal(shouldRejectSauveteurBrowserLogin(
+      undefined, false), false);
+  assert.equal(shouldRejectSauveteurBrowserLogin(
+      "", false), false);
+  assert.equal(shouldRejectSauveteurBrowserLogin(
+      "https://sphot.app", true), false);
+
+  const start = source.indexOf("async function handleSauveteurLogin(");
+  const end = source.indexOf("exports.loginSauveteur =", start);
+  assert.ok(start > 0 && end > start);
+  const handler = source.slice(start, end);
+  const gate = handler.indexOf("shouldRejectSauveteurBrowserLogin(");
+  assert.ok(gate > handler.indexOf("verifyAccountPassword(data, password)"));
+  assert.ok(gate < handler.indexOf("createSauveteurSession("));
+  assert.match(handler, /sauveteur_mobile_only/);
 });
 
 test("SAUVETEUR : nouvelle CGU ou Charte exige reacceptation", async () => {

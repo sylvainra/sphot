@@ -2,6 +2,8 @@ const {sendSphotMail} = require("./sphot_email_design");
 const {evaluateFlagTransition} = require("./sauveteur_flag_transition");
 const {surveillanceWindow} = require("./sauveteur_surveillance_schedule");
 const {autoLowerClosedFlags} = require("./sauveteur_flag_auto_lower");
+const {shouldRejectSauveteurBrowserLogin} =
+    require("./sauveteur_web_access");
 const {setGlobalOptions} = require("firebase-functions");
 const {defineString} = require("firebase-functions/params");
 const {onRequest} = require("firebase-functions/v2/https");
@@ -5672,6 +5674,18 @@ async function handleSauveteurLogin(request, response, pilot = false) {
 
     if (!verifyAccountPassword(data, password)) {
       response.status(401).json({success: false});
+      return;
+    }
+
+    // Un compte SAUVETEUR ne peut pas ouvrir de session depuis le Web.
+    // Le Super Admin conserve son parcours historique de connexion Web.
+    // Origin filtre le navigateur courant, sans attester un appareil Android.
+    if (shouldRejectSauveteurBrowserLogin(
+        request.get("origin"), isSuperAdminAccount(data))) {
+      if (attempt) await attempt.clear();
+      response.status(403).json({
+        success: false, error: "sauveteur_mobile_only",
+      });
       return;
     }
 
