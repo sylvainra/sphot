@@ -184,6 +184,22 @@ Future<void> _saveDraft() async {
 
   final firestore = FirebaseFirestore.instance;
 
+  // L'identifiant de la période reste stable lorsque l'Admin modifie
+  // son intitulé ou ses horaires. Garder les libellés historiques existants.
+  final periodsSnapshot = await firestore
+      .collection('territoires')
+      .doc(widget.territoireId)
+      .collection('periodesSurveillance')
+      .get();
+  final selectedLabels = periodesSelectionnees.toSet();
+  final assignedPeriodIds = periodsSnapshot.docs
+      .where((doc) => selectedLabels.contains(
+            (doc.data()['label'] ?? doc.data()['name'] ?? '')
+                .toString(),
+          ))
+      .map((doc) => doc.id)
+      .toList();
+
   final batch = firestore.batch();
 
   for (final spotId in selectedDocIds) {
@@ -197,6 +213,7 @@ Future<void> _saveDraft() async {
       spotRef,
       {
         'periodesSurveillance': periodesSelectionnees,
+        'periodesSurveillanceIds': assignedPeriodIds,
         'periodesSurveillanceUpdatedAt': FieldValue.serverTimestamp(),
       },
       SetOptions(merge: true),

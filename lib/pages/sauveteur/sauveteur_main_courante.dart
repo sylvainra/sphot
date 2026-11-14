@@ -148,6 +148,12 @@ class _SauveteurMainCourantePageState
 
   bool get _canWrite => _isSphotOn && _isSupervisor;
 
+  // Les événements Drapeau sont supprimables par un sauveteur affecté ;
+  // l'original reste conservé dans l'audit côté serveur.
+  bool _canDeleteFlagEntry(Map<String, dynamic> entry) =>
+      _isSphotOn &&
+      (entry['type'] ?? '').toString().trim().toLowerCase() == 'drapeau';
+
   DateTime get _today {
     final now = DateTime.now();
     return DateTime(now.year, now.month, now.day);
@@ -2026,7 +2032,10 @@ class _SauveteurMainCourantePageState
   }
 
   Future<void> _deleteEntry(Map<String, dynamic> entry) async {
-    if (!_canWrite || _entryMutationInProgress) return;
+    if ((!_canWrite && !_canDeleteFlagEntry(entry)) ||
+        _entryMutationInProgress) {
+      return;
+    }
 
     final entryId = (entry['id'] ?? '').toString().trim();
     if (entryId.isEmpty) return;
@@ -2249,6 +2258,10 @@ class _SauveteurMainCourantePageState
           ? Map<String, dynamic>.from(entry['createdBy'] as Map)
           : <String, dynamic>{};
       final role = (createdBy['role'] ?? '').toString().trim();
+      final author = sauveteurVerificationAuthor(
+        entry,
+        personnel: _presenceCandidates,
+      );
       final action = (entry['actionTaken'] ?? '').toString().trim();
       final visibility = (entry['visibility'] ?? 'operational').toString();
       final restricted = visibility == 'restricted';
@@ -2375,10 +2388,10 @@ class _SauveteurMainCourantePageState
                 ),
               ),
             ],
-            if (role.isNotEmpty) ...[
+            if (author != 'Non renseigné' || role.isNotEmpty) ...[
               pw.SizedBox(height: 5),
               pw.Text(
-                'Saisi par : $role',
+                'Auteur : $author${role.isEmpty ? '' : ' — $role'}',
                 style: const pw.TextStyle(
                   fontSize: 7.5,
                   color: PdfColors.grey700,
@@ -3035,6 +3048,10 @@ class _SauveteurMainCourantePageState
         ? Map<String, dynamic>.from(entry['createdBy'] as Map)
         : <String, dynamic>{};
     final role = (createdBy['role'] ?? '').toString();
+    final author = sauveteurVerificationAuthor(
+      entry,
+      personnel: _presenceCandidates,
+    );
     final visibility = (entry['visibility'] ?? 'operational').toString();
     final source = (entry['source'] ?? '').toString().trim();
     final automatic = source.startsWith('automatic_');
@@ -3246,10 +3263,10 @@ class _SauveteurMainCourantePageState
                     ),
                   ),
                 ],
-                if (role.isNotEmpty) ...[
+                if (author != 'Non renseigné' || role.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(
-                    'Saisi par : $role',
+                    'Auteur : $author${role.isEmpty ? '' : ' — $role'}',
                     style: const TextStyle(
                       color: Colors.black54,
                       fontSize: 10,
@@ -3257,15 +3274,16 @@ class _SauveteurMainCourantePageState
                     ),
                   ),
                 ],
-                if (_canWrite) ...[
+                if (_canWrite || _canDeleteFlagEntry(entry)) ...[
                   const SizedBox(height: 4),
                   Align(
                     alignment: Alignment.centerRight,
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        IconButton(
-                          tooltip: 'Modifier',
+                        if (_canWrite)
+                          IconButton(
+                            tooltip: 'Modifier',
                           visualDensity: VisualDensity.compact,
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(

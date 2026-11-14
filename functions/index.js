@@ -1,4 +1,7 @@
 const {sendSphotMail} = require("./sphot_email_design");
+const {evaluateFlagTransition} = require("./sauveteur_flag_transition");
+const {surveillanceWindow} = require("./sauveteur_surveillance_schedule");
+const {autoLowerClosedFlags} = require("./sauveteur_flag_auto_lower");
 const {setGlobalOptions} = require("firebase-functions");
 const {defineString} = require("firebase-functions/params");
 const {onRequest} = require("firebase-functions/v2/https");
@@ -7312,6 +7315,27 @@ exports.updateInstitutionalMainCourantePreferences = onRequest(
     },
 );
 
+/**
+ * Vérifie à chaque minute les drapeaux numériques hissés et affale ceux
+ * dont les horaires de surveillance Admin sont terminés.
+ * Fonction distincte du hissage manuel et sans session sauveteur.
+ */
+exports.autoLowerSauveteurFlags = onSchedule(
+    {
+      schedule: "* * * * *",
+      timeZone: "Etc/UTC",
+      region: "us-central1",
+      cpu: 1,
+      memory: "256MiB",
+      timeoutSeconds: 540,
+      maxInstances: 1,
+    },
+    async () => {
+      const results = await autoLowerClosedFlags(admin.firestore(), admin);
+      console.log("Affalages automatiques SPHOT:", results);
+    },
+);
+
 exports.updateSauveteurLiveState = onRequest(
     {
       secrets: ["GMAIL_APP_PASSWORD"],
@@ -7447,198 +7471,182 @@ exports.updateSauveteurLiveState = onRequest(
 
         const db = admin.firestore();
         const spotReference = db.collection("spots").doc(spotId);
-        const spotSnapshot = await spotReference.get();
-        const previousSpot = spotSnapshot.data() || {};
-        const previousLiveFlag = previousSpot.liveFlag || {};
-        const auditReference = db.collection("sauveteurOperationalAudit").doc();
+        const outcome = await db.runTransaction(async (transaction) => {
+          const spotSnapshot = await transaction.get(spotReference);
+          const previousSpot = spotSnapshot.data() || {};
+          const previousLiveFlag = previousSpot.liveFlag || {};
+          const auditReference = db
+              .collection("sauveteurOperationalAudit").doc();
 
-        const flagJournalLines = [];
-        let flagWasLowered = false;
-        let flagWasRaised = false;
-        let loweredFlagColor = "";
-        const nextLiveFlag = sanitizedChanges.liveFlag;
-
-        if (nextLiveFlag &&
-            typeof nextLiveFlag === "object" &&
-            !Array.isArray(nextLiveFlag)) {
-          const colorLabel = (value) => {
-            const normalized = (value || "").toString().toLowerCase();
-            if (normalized === "green" || normalized === "vert") {
-              return "Vert";
-            }
-            if (normalized === "yellow" || normalized === "jaune") {
-              return "Jaune";
-            }
-            if (normalized === "red" || normalized === "rouge") {
-              return "Rouge";
-            }
-            if (normalized === "violet") {
-              return "Violet";
-            }
-            return "Non renseigné";
-          };
-
-          const positionLabel = (value) => {
-            const normalized = (value || "").toString().toLowerCase();
-            if (normalized === "hisse" || normalized === "hissé") {
-              return "Hissé";
-            }
-            if (normalized === "affale" || normalized === "affalé") {
-              return "Affalé";
-            }
-            return "Non renseignée";
-          };
-
-          const oldColor = colorLabel(previousLiveFlag.flagColor);
-          const newColor = colorLabel(nextLiveFlag.flagColor);
-          const oldPosition = positionLabel(previousLiveFlag.flagPosition);
-          const newPosition = positionLabel(nextLiveFlag.flagPosition);
-
-          if (oldColor !== newColor) {
-            flagJournalLines.push(
-                `Couleur du drapeau : ${oldColor} → ${newColor}`,
-            );
+          const territoireSpotReference = db
+              .collection("territoires")
+              .doc(context.territoireId)
+              .collection("spots")
+              .doc(spotId);
+          const nextLiveFlag = sanitizedChanges.liveFlag;
+          const flagTransition = nextLiveFlag === undefined ?
+            null : evaluateFlagTransition(previousLiveFlag, nextLiveFlag);
+          if (flagTransition && flagTransition.error) {
+            const rejected = new Error(flagTransition.error);
+            rejected.httpStatus =
+              flagTransition.error === "invalid_flag_state" ? 400 : 409;
+            throw rejected;
           }
 
-          if (oldPosition !== newPosition) {
-            flagJournalLines.push(
-                `Position du drapeau : ${oldPosition} → ${newPosition}`,
-            );
+          let territorySpot = {};
+          if (flagTransition && flagTransition.requiresOpenSurveillance) {
+            const territorySpotSnapshot =
+              await transaction.get(territoireSpotReference);
+            territorySpot = territorySpotSnapshot.data() || {};
           }
 
-          flagWasLowered =
-            oldPosition !== "Affalé" && newPosition === "Affalé";
-          flagWasRaised =
-            oldPosition === "Affalé" && newPosition === "Hissé";
-          if (flagWasLowered) loweredFlagColor = newColor;
-        }
+          if (flagTransition && flagTransition.requiresOpenSurveillance) {
+            const periodsSnapshot = await transaction.get(
+                db.collection("territoires")
+                    .doc(context.territoireId)
+                    .collection("periodesSurveillance"),
+            );
+            const periods = periodsSnapshot.docs.map((period) => ({
+              id: period.id,
+              ...period.data(),
+            }));
+            const schedule = surveillanceWindow(
+                territorySpot, periods, new Date(),
+            );
+            if (!schedule.open) {
+              const denied = new Error(
+                  schedule.configured ?
+                    "surveillance_closed" : "surveillance_schedule_missing",
+              );
+              denied.httpStatus = 409;
+              throw denied;
+            }
+          }
 
-        let operationalAlertUpdate = null;
-        let operationalAlertMessage = "";
+          const flagJournalLines =
+            flagTransition ? flagTransition.journalLines : [];
+          const flagWasLowered =
+            flagTransition ? flagTransition.flagWasLowered : false;
+          const flagWasRaised =
+            flagTransition ? flagTransition.flagWasRaised : false;
+          const loweredFlagColor =
+            flagTransition ? flagTransition.loweredFlagColor : "";
 
-        if (flagWasLowered || flagWasRaised) {
-          let spotLabel = spotId;
-          try {
-            const territorySpotSnapshot = await db
-                .collection("territoires")
-                .doc(context.territoireId)
-                .collection("spots")
-                .doc(spotId)
-                .get();
-            const territorySpot = territorySpotSnapshot.data() || {};
-            spotLabel = (
+          let operationalAlertUpdate = null;
+          let operationalAlertMessage = "";
+
+          if (flagWasLowered || flagWasRaised) {
+            const spotLabel = (
               territorySpot.nomSecours ||
               territorySpot.nomSphot ||
               territorySpot.idSphot ||
               spotId
             ).toString().trim();
-          } catch (_) {
-            // Le numéro technique du poste reste exploitable en secours.
+
+            if (flagWasLowered) {
+              const loweringTime = formatFrenchOperationalTime(new Date());
+              operationalAlertMessage =
+                `Drapeau du poste de secours ${spotLabel} affalé à ` +
+                `${loweringTime}.`;
+              operationalAlertUpdate = {
+                type: "flag_lowered",
+                active: true,
+                message: operationalAlertMessage,
+                flagColor: loweredFlagColor,
+                triggeredAt: admin.firestore.FieldValue.serverTimestamp(),
+                endedAt: null,
+                source: "automatic_flag_event",
+              };
+            } else if (flagWasRaised) {
+              operationalAlertUpdate = {
+                type: "flag_lowered",
+                active: false,
+                message: `Drapeau du poste de secours ${spotLabel} hissé`,
+                endedAt: admin.firestore.FieldValue.serverTimestamp(),
+                source: "automatic_flag_event",
+              };
+            }
           }
 
-          if (flagWasLowered) {
-            const loweringTime = formatFrenchOperationalTime(new Date());
-            operationalAlertMessage =
-              `Drapeau du poste de secours ${spotLabel} affalé à ` +
-              `${loweringTime}.`;
-            operationalAlertUpdate = {
-              type: "flag_lowered",
-              active: true,
-              message: operationalAlertMessage,
-              flagColor: loweredFlagColor,
-              triggeredAt: admin.firestore.FieldValue.serverTimestamp(),
-              endedAt: null,
-              source: "automatic_flag_event",
-            };
-          } else if (flagWasRaised) {
-            operationalAlertUpdate = {
-              type: "flag_lowered",
-              active: false,
-              message: `Drapeau du poste de secours ${spotLabel} hissé`,
-              endedAt: admin.firestore.FieldValue.serverTimestamp(),
-              source: "automatic_flag_event",
-            };
-          }
-        }
+          transaction.set(spotReference, {
+            ...sanitizedChanges,
+            ...(operationalAlertUpdate ?
+              {operationalAlert: operationalAlertUpdate} : {}),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            // Seules les nouvelles publications sauveteur débloquent l'état
+            // awaiting_update après activation du droit temps réel.
+            liveUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedBySauveteurId: context.sauveteurId,
+          }, {merge: true});
+          transaction.set(auditReference, {
+            territoireId: context.territoireId,
+            spotId,
+            sauveteurId: context.sauveteurId,
+            login: session.login,
+            role: context.userRole,
+            changes: sanitizedChanges,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
 
-        const batch = db.batch();
-        batch.set(spotReference, {
-          ...sanitizedChanges,
-          ...(operationalAlertUpdate ?
-            {operationalAlert: operationalAlertUpdate} : {}),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          // Seules les nouvelles publications sauveteur débloquent l'état
-          // awaiting_update après activation du droit temps réel.
-          liveUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedBySauveteurId: context.sauveteurId,
-        }, {merge: true});
-        batch.set(auditReference, {
-          territoireId: context.territoireId,
-          spotId,
-          sauveteurId: context.sauveteurId,
-          login: session.login,
-          role: context.userRole,
-          changes: sanitizedChanges,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          if (flagJournalLines.length > 0) {
+            const mainCouranteReference = db
+                .collection("territoires")
+                .doc(context.territoireId)
+                .collection("spots")
+                .doc(spotId)
+                .collection("mainCourante")
+                .doc();
+
+            transaction.set(mainCouranteReference, {
+              type: "Drapeau",
+              description: flagJournalLines.join(" • "),
+              actionTaken: "Enregistrement automatique SPHOT SAUVETEUR",
+              visibility: "operational",
+              occurredAt: admin.firestore.FieldValue.serverTimestamp(),
+              createdAt: admin.firestore.FieldValue.serverTimestamp(),
+              createdBy: {
+                sauveteurId: context.sauveteurId,
+                login: session.login,
+                role: context.userRole,
+              },
+              source: "automatic_flag_event",
+              immutableOriginal: true,
+            });
+          }
+
+          if (automaticNotificationMainCourante) {
+            const mainCouranteReference = db
+                .collection("territoires")
+                .doc(context.territoireId)
+                .collection("spots")
+                .doc(spotId)
+                .collection("mainCourante")
+                .doc();
+
+            transaction.set(mainCouranteReference, {
+              type: "Personne recherchée",
+              description: automaticNotificationMainCourante.description,
+              actionTaken:
+                "Notification publique publiée automatiquement depuis " +
+                "RECHERCHE DE PERSONNE",
+              visibility: "operational",
+              occurredAt: admin.firestore.FieldValue.serverTimestamp(),
+              createdAt: admin.firestore.FieldValue.serverTimestamp(),
+              createdBy: {
+                sauveteurId: context.sauveteurId,
+                login: session.login,
+                role: context.userRole,
+              },
+              source: "automatic_person_search_publication",
+              publicNotificationMessage:
+                automaticNotificationMainCourante.publicMessage,
+              immutableOriginal: true,
+            });
+          }
+
+          return {flagWasLowered, operationalAlertMessage};
         });
-
-        if (flagJournalLines.length > 0) {
-          const mainCouranteReference = db
-              .collection("territoires")
-              .doc(context.territoireId)
-              .collection("spots")
-              .doc(spotId)
-              .collection("mainCourante")
-              .doc();
-
-          batch.set(mainCouranteReference, {
-            type: "Drapeau",
-            description: flagJournalLines.join(" • "),
-            actionTaken: "Enregistrement automatique SPHOT SAUVETEUR",
-            visibility: "operational",
-            occurredAt: admin.firestore.FieldValue.serverTimestamp(),
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            createdBy: {
-              sauveteurId: context.sauveteurId,
-              login: session.login,
-              role: context.userRole,
-            },
-            source: "automatic_flag_event",
-            immutableOriginal: true,
-          });
-        }
-
-        if (automaticNotificationMainCourante) {
-          const mainCouranteReference = db
-              .collection("territoires")
-              .doc(context.territoireId)
-              .collection("spots")
-              .doc(spotId)
-              .collection("mainCourante")
-              .doc();
-
-          batch.set(mainCouranteReference, {
-            type: "Personne recherchée",
-            description: automaticNotificationMainCourante.description,
-            actionTaken:
-              "Notification publique publiée automatiquement depuis " +
-              "RECHERCHE DE PERSONNE",
-            visibility: "operational",
-            occurredAt: admin.firestore.FieldValue.serverTimestamp(),
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            createdBy: {
-              sauveteurId: context.sauveteurId,
-              login: session.login,
-              role: context.userRole,
-            },
-            source: "automatic_person_search_publication",
-            publicNotificationMessage:
-              automaticNotificationMainCourante.publicMessage,
-            immutableOriginal: true,
-          });
-        }
-
-        await batch.commit();
+        const {flagWasLowered, operationalAlertMessage} = outcome;
 
         if (flagWasLowered) {
           await sendInstitutionalOperationalNotification({
@@ -7654,6 +7662,17 @@ exports.updateSauveteurLiveState = onRequest(
 
         response.status(200).json({success: true});
       } catch (error) {
+        if (error.httpStatus &&
+            (error.message === "invalid_flag_state" ||
+             error.message === "flag_color_requires_lowered" ||
+             error.message === "surveillance_closed" ||
+             error.message === "surveillance_schedule_missing")) {
+          response.status(error.httpStatus).json({
+            success: false,
+            error: error.message,
+          });
+          return;
+        }
         console.error("Erreur mise à jour live sauveteur:", error);
         response.status(500).json({success: false});
       }
@@ -12159,14 +12178,6 @@ exports.deleteSauveteurMainCouranteEntry = onRequest(
           return;
         }
 
-        if (!context.canManageRestrictedOperationalData) {
-          response.status(403).json({
-            success: false,
-            error: "insufficient_role",
-          });
-          return;
-        }
-
         if (!entryId) {
           response.status(400).json({
             success: false,
@@ -12188,6 +12199,19 @@ exports.deleteSauveteurMainCouranteEntry = onRequest(
           response.status(404).json({
             success: false,
             error: "entry_not_found",
+          });
+          return;
+        }
+
+        // Les sauveteurs affectés peuvent retirer les saisies de drapeau.
+        // Les autres événements conservent le droit de supervision existant.
+        const entryData = entrySnapshot.data() || {};
+        const isFlagEntry = (entryData.type || "").toString()
+            .trim().toLowerCase() === "drapeau";
+        if (!context.canManageRestrictedOperationalData && !isFlagEntry) {
+          response.status(403).json({
+            success: false,
+            error: "insufficient_role",
           });
           return;
         }

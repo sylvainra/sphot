@@ -87,7 +87,7 @@ void main() {
     expect(source.contains(r'Auteur : $author\n$body'), isTrue);
     expect(
       source.split('sauveteurVerificationAuthor(').length - 1,
-      2,
+      4,
     );
   });
 

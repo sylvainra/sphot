@@ -40,8 +40,33 @@ class SauveteurActionsRapidesPage extends StatefulWidget {
 class _SauveteurActionsRapidesPageState
     extends State<SauveteurActionsRapidesPage> {
   String flagColor = 'Vert';
-  String flagPosition = 'Hissé';
-  String status = 'Baignade surveillée';
+  String flagPosition = 'Affalé';
+  String status = 'Baignade non surveillée temporairement';
+
+  // Dernier état constaté sur Firestore, distinct de l'animation locale.
+  String _confirmedFlagColor = 'Vert';
+  String _confirmedFlagPosition = 'Affalé';
+  bool _confirmedPurpleFlagActive = false;
+  bool _confirmedWindsockActive = false;
+  bool _liveFlagLoaded = false;
+  bool _flagWriteInProgress = false;
+  String? _dragRequestedFlagPosition;
+
+  bool get _canChangeFlagColor =>
+      widget.isSphotOn &&
+      _liveFlagLoaded &&
+      !_flagWriteInProgress &&
+      _confirmedFlagPosition == 'Affalé';
+
+  void _restoreConfirmedFlagState() {
+    flagColor = _confirmedFlagColor;
+    flagPosition = _confirmedFlagPosition;
+    purpleFlagActive = _confirmedPurpleFlagActive;
+    windsockActive = _confirmedWindsockActive;
+    status = flagPosition == 'Affalé'
+        ? 'Baignade non surveillée temporairement'
+        : _statusForFlagColor(flagColor);
+  }
   bool purpleFlagActive = false;
   bool windsockActive = false;
 
@@ -167,6 +192,7 @@ class _SauveteurActionsRapidesPageState
   }
 
   Future<void> _selectSpot(Map<String, String> poste) async {
+    if (_flagWriteInProgress) return;
     await _liveSubscription?.cancel();
     _liveSubscription = null;
 
@@ -179,11 +205,22 @@ class _SauveteurActionsRapidesPageState
       typeSphot = poste['typeSphot'] ?? 'Poste de secours';
       _liveWriteBlocked = false;
       _liveStatusMessage = null;
+      _liveFlagLoaded = false;
+      _confirmedFlagColor = 'Vert';
+      _confirmedFlagPosition = 'Affalé';
+      _confirmedPurpleFlagActive = false;
+      _confirmedWindsockActive = false;
+      _dragRequestedFlagPosition = null;
+      flagColor = 'Vert';
+      flagPosition = 'Affalé';
+      status = 'Baignade non surveillée temporairement';
+      purpleFlagActive = false;
+      windsockActive = false;
 
       if (!widget.isSphotOn) {
         flagColor = 'Vert';
-        flagPosition = 'Hissé';
-        status = 'Baignade surveillée';
+        flagPosition = 'Affalé';
+        status = 'Baignade non surveillée temporairement';
         purpleFlagActive = false;
         windsockActive = false;
         selectedDangers.clear();
@@ -235,14 +272,16 @@ class _SauveteurActionsRapidesPageState
       final rawDangers = data['dangers'];
 
       setState(() {
-        if (nextColor != null) flagColor = nextColor;
-        if (nextPosition != null) flagPosition = nextPosition;
-        purpleFlagActive = nextPurpleFlagActive;
-        windsockActive = nextWindsockActive;
+        if (nextColor != null) _confirmedFlagColor = nextColor;
+        if (nextPosition != null) _confirmedFlagPosition = nextPosition;
+        _confirmedPurpleFlagActive = nextPurpleFlagActive;
+        _confirmedWindsockActive = nextWindsockActive;
+        _liveFlagLoaded = true;
 
-        status = flagPosition == 'Affalé'
-            ? 'Baignade non surveillée temporairement'
-            : _statusForFlagColor(flagColor);
+        // Ne pas effacer la prévisualisation pendant une sauvegarde.
+        if (!_flagWriteInProgress) {
+          _restoreConfirmedFlagState();
+        }
 
         if (rawDangers is Iterable) {
           final values = rawDangers.map((value) => value.toString()).toList();
@@ -328,11 +367,19 @@ class _SauveteurActionsRapidesPageState
       if (!mounted) return false;
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        setState(() {
-          _liveWriteBlocked = false;
-          _liveStatusMessage = null;
-        });
-        return true;
+        bool confirmed = false;
+        try {
+          final result = jsonDecode(response.body);
+          confirmed = result is Map<String, dynamic> &&
+              result['success'] == true;
+        } catch (_) {}
+        if (confirmed) {
+          setState(() {
+            _liveWriteBlocked = false;
+            _liveStatusMessage = null;
+          });
+          return true;
+        }
       }
 
       String errorCode = '';
@@ -346,10 +393,44 @@ class _SauveteurActionsRapidesPageState
       setState(() {
         _liveWriteBlocked = errorCode == 'sphot_off' ||
             errorCode == 'spot_not_assigned';
-        _liveStatusMessage = _liveWriteBlocked
-            ? 'SPHOT OFF — cette action reste locale et ne modifie pas '
-                'le poste réel.'
-            : 'La modification opérationnelle n’a pas pu être enregistrée.';
+        switch (errorCode) {
+          case 'flag_color_requires_lowered':
+            _liveStatusMessage =
+                'Changement refusé : affalez d’abord le drapeau, '
+                'puis choisissez sa couleur avant de le hisser.';
+            break;
+          case 'sphot_off':
+          case 'spot_not_assigned':
+            _liveStatusMessage =
+                'Accès temps réel refusé : SPHOT OFF ou poste non autorisé.';
+            break;
+          case 'invalid_session':
+            _liveStatusMessage =
+                'Session expirée ou invalide : reconnectez-vous.';
+            break;
+          case 'legal_acceptance_required':
+            _liveStatusMessage =
+                'Validation juridique requise : reconnectez-vous.';
+            break;
+          case 'invalid_flag_state':
+            _liveStatusMessage = 'État du drapeau non reconnu par le serveur.';
+            break;
+          case 'surveillance_closed':
+            _liveStatusMessage =
+                'Manœuvre refusée : le poste est hors des horaires '
+                'de surveillance définis par SPHOT Admin.';
+            break;
+          case 'surveillance_schedule_missing':
+            _liveStatusMessage =
+                'Manœuvre refusée : aucune période de surveillance '
+                'valide n’est attribuée à ce poste.';
+            break;
+          default:
+            _liveStatusMessage =
+                'Enregistrement refusé (HTTP ${response.statusCode}'
+                '${errorCode.isEmpty ? '' : ' — $errorCode'}). '
+                'État du drapeau restauré.';
+        }
       });
 
       return false;
@@ -364,69 +445,111 @@ class _SauveteurActionsRapidesPageState
     }
   }
 
-  Future<void> _persistFlagState() async {
-    final currentStatus = flagPosition == 'Affalé'
-        ? 'Baignade non surveillée temporairement'
-        : _statusForFlagColor(flagColor);
+  // L'état public et le drapeau dessiné ne changent qu'après confirmation.
+  Future<void> _persistFlagState({
+    String? requestedColor,
+    String? requestedPosition,
+    bool? requestedPurpleFlagActive,
+    bool? requestedWindsockActive,
+  }) async {
+    if (_flagWriteInProgress) return;
+    if (!widget.isSphotOn || !_liveFlagLoaded) {
+      setState(() {
+        _restoreConfirmedFlagState();
+        _liveStatusMessage = !widget.isSphotOn
+            ? 'SPHOT OFF : aucun changement réel de drapeau enregistré.'
+            : 'Chargement de l’état réel du drapeau en cours.';
+      });
+      return;
+    }
 
-    await _persistLiveChanges({
+    final nextColor = requestedColor ?? _confirmedFlagColor;
+    final nextPosition = requestedPosition ?? _confirmedFlagPosition;
+    final nextPurple = requestedPurpleFlagActive ?? _confirmedPurpleFlagActive;
+    final nextWindsock = requestedWindsockActive ?? _confirmedWindsockActive;
+
+    if (nextColor == _confirmedFlagColor &&
+        nextPosition == _confirmedFlagPosition &&
+        nextPurple == _confirmedPurpleFlagActive &&
+        nextWindsock == _confirmedWindsockActive) {
+      return;
+    }
+
+    final nextStatus = nextPosition == 'Affalé'
+        ? 'Baignade non surveillée temporairement'
+        : _statusForFlagColor(nextColor);
+
+    setState(() => _flagWriteInProgress = true);
+    final saved = await _persistLiveChanges({
       'liveFlag': {
-        'flagColor': _flagColorValue(flagColor),
-        'flagPosition': _flagPositionValue(flagPosition),
-        'purpleFlagActive': purpleFlagActive,
-        'windsockActive': windsockActive,
+        'flagColor': _flagColorValue(nextColor),
+        'flagPosition': _flagPositionValue(nextPosition),
+        'purpleFlagActive': nextPurple,
+        'windsockActive': nextWindsock,
       },
-      'statutBaignade': currentStatus,
+      'statutBaignade': nextStatus,
+    });
+
+    if (!mounted) return;
+    setState(() {
+      _flagWriteInProgress = false;
+      if (saved) {
+        _confirmedFlagColor = nextColor;
+        _confirmedFlagPosition = nextPosition;
+        _confirmedPurpleFlagActive = nextPurple;
+        _confirmedWindsockActive = nextWindsock;
+      }
+      _restoreConfirmedFlagState();
     });
   }
 
   Future<void> _togglePurpleFlag() async {
-    setState(() {
-      purpleFlagActive = !purpleFlagActive;
-    });
-
-    await _persistFlagState();
+    if (_flagWriteInProgress) return;
+    await _persistFlagState(
+      requestedPurpleFlagActive: !_confirmedPurpleFlagActive,
+    );
   }
 
   Future<void> _toggleWindsock() async {
-    setState(() {
-      windsockActive = !windsockActive;
-    });
-
-    await _persistFlagState();
+    if (_flagWriteInProgress) return;
+    await _persistFlagState(
+      requestedWindsockActive: !_confirmedWindsockActive,
+    );
   }
 
   Future<void> _changeFlagColor(String color) async {
-    setState(() {
-      flagColor = color;
-      if (flagPosition != 'Affalé') {
-        status = _statusForFlagColor(color);
-      }
-    });
-
-    await _persistFlagState();
+    if (color == _confirmedFlagColor || _flagWriteInProgress) return;
+    if (!_canChangeFlagColor) {
+      setState(() {
+        _liveStatusMessage = !_liveFlagLoaded
+            ? 'Chargement de l’état réel du drapeau en cours.'
+            : 'Pour changer de couleur, affalez d’abord le drapeau.';
+      });
+      return;
+    }
+    await _persistFlagState(requestedColor: color);
   }
 
   Future<void> updateFlagPosition(String position) async {
-    setState(() {
-      flagPosition = position;
-      status = position == 'Affalé'
-          ? 'Baignade non surveillée temporairement'
-          : _statusForFlagColor(flagColor);
-    });
-
-    await _persistFlagState();
+    if (_flagWriteInProgress) return;
+    if (!_liveFlagLoaded || !widget.isSphotOn) {
+      setState(() {
+        _restoreConfirmedFlagState();
+        _liveStatusMessage = !widget.isSphotOn
+            ? 'SPHOT OFF : impossible de modifier le drapeau réel.'
+            : 'Chargement de l’état réel du drapeau en cours.';
+      });
+      return;
+    }
+    await _persistFlagState(requestedPosition: position);
   }
 
   void _previewFlagPosition(String position) {
-    if (flagPosition == position) return;
-
-    setState(() {
-      flagPosition = position;
-      status = position == 'Affalé'
-          ? 'Baignade non surveillée temporairement'
-          : _statusForFlagColor(flagColor);
-    });
+    if (_flagWriteInProgress || !_liveFlagLoaded || !widget.isSphotOn) {
+      return;
+    }
+    // Le geste mémorise la position demandée sans simuler le hissage.
+    _dragRequestedFlagPosition = position;
   }
 
   SpotFlagState _previewSpotState() {
@@ -616,7 +739,14 @@ class _SauveteurActionsRapidesPageState
               _previewFlagPosition(next);
             },
             onVerticalDragEnd: (_) {
-              unawaited(_persistFlagState());
+              final requested = _dragRequestedFlagPosition;
+              _dragRequestedFlagPosition = null;
+              if (requested != null) {
+                unawaited(updateFlagPosition(requested));
+              }
+            },
+            onVerticalDragCancel: () {
+              _dragRequestedFlagPosition = null;
             },
             child: Stack(
               alignment: Alignment.center,
@@ -773,7 +903,7 @@ class _SauveteurActionsRapidesPageState
         final double messagesHeight =
             (_loadingSpots ? 14.0 : 0.0) +
             (!_loadingSpots && postesSecoursCommune.isEmpty ? 38.0 : 0.0) +
-            (_liveStatusMessage != null ? 26.0 : 0.0);
+            (_liveStatusMessage != null ? 42.0 : 0.0);
         final double bandeauHeight =
             ((pageConstraints.maxHeight - espacesFixes - messagesHeight) / 7)
                 .clamp(48.0, 120.0)
@@ -888,6 +1018,7 @@ class _SauveteurActionsRapidesPageState
                                               label: 'Vert',
                                               color: const Color(0xFF22C55E),
                                               selected: flagColor == 'Vert',
+                                              enabled: _canChangeFlagColor,
                                               onTap: () {
                                                 _changeFlagColor('Vert');
                                               },
@@ -899,6 +1030,7 @@ class _SauveteurActionsRapidesPageState
                                               label: 'Jaune',
                                               color: const Color(0xFFFDE047),
                                               selected: flagColor == 'Jaune',
+                                              enabled: _canChangeFlagColor,
                                               onTap: () {
                                                 _changeFlagColor('Jaune');
                                               },
@@ -910,6 +1042,7 @@ class _SauveteurActionsRapidesPageState
                                               label: 'Rouge',
                                               color: const Color(0xFFEF4444),
                                               selected: flagColor == 'Rouge',
+                                              enabled: _canChangeFlagColor,
                                               onTap: () {
                                                 _changeFlagColor('Rouge');
                                               },
@@ -1432,24 +1565,27 @@ class _FlagColorButton extends StatelessWidget {
   final String label;
   final Color color;
   final bool selected;
+  final bool enabled;
   final VoidCallback onTap;
 
   const _FlagColorButton({
     required this.label,
     required this.color,
     required this.selected,
+    required this.enabled,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      // Même désactivé, le tap explique pourquoi la couleur est bloquée.
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         width: double.infinity,
         decoration: BoxDecoration(
-          color: color,
+          color: enabled ? color : Color.lerp(color, Colors.grey, 0.50)!,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: selected ? Colors.black : Colors.transparent,
