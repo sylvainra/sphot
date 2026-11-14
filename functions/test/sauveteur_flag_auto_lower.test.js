@@ -21,7 +21,7 @@ const period = {
  */
 function fixture({
   now, rootPosition = "hisse", currentPosition = null,
-  purple = false, windsock = false,
+  purple = false, windsock = false, prepared = null,
 } = {}) {
   const writes = [];
   const spotData = {
@@ -30,6 +30,7 @@ function fixture({
       flagColor: "green", flagPosition: rootPosition,
       purpleFlagActive: purple, windsockActive: windsock,
     },
+    preparedFlag: prepared ? {...prepared, pending: true} : null,
   };
   const rootRef = {kind: "root"};
   const territorySpotRef = {
@@ -55,7 +56,9 @@ function fixture({
               limit: () => ({
                 get: async () => {
                   const key = field.split(".").pop();
-                  const current = spotData.liveFlag[key];
+                  const state = field.startsWith("preparedFlag.") ?
+                    spotData.preparedFlag : spotData.liveFlag;
+                  const current = state && state[key];
                   const found = operator === "in" ?
                     value.includes(current) : current === value;
                   return {
@@ -94,6 +97,7 @@ function fixture({
                 flagPosition: currentPosition || rootPosition,
                 purpleFlagActive: purple, windsockActive: windsock,
               },
+              preparedFlag: prepared ? {...prepared, pending: true} : null,
             })};
           }
           return ref.get();
@@ -106,11 +110,57 @@ function fixture({
   const admin = {
     firestore: {
       FieldPath: {documentId: () => "id"},
-      FieldValue: {serverTimestamp: () => "server-time"},
+      FieldValue: {
+        serverTimestamp: () => "server-time",
+        delete: () => "deleted",
+      },
     },
   };
   return {db: chain, admin, writes, now};
 }
+
+test("préparation hors horaires : aucune diffusion publique", async () => {
+  const ctx = fixture({
+    now: new Date("2026-11-14T09:59:00Z"),
+    rootPosition: "affale",
+    prepared: {
+      flagColor: "yellow", purpleFlagActive: true,
+      windsockActive: true,
+    },
+  });
+  const result = await autoLowerClosedFlags(ctx.db, ctx.admin, ctx.now);
+  assert.equal(result.published, 0);
+  assert.equal(result.lowered, 0);
+  assert.equal(ctx.writes.length, 0);
+});
+
+test("à 11h00 : préparation publiée sans hissage automatique", async () => {
+  const ctx = fixture({
+    now: new Date("2026-11-14T10:00:00Z"),
+    rootPosition: "affale",
+    prepared: {
+      flagColor: "yellow", purpleFlagActive: true,
+      windsockActive: true,
+    },
+  });
+  const result = await autoLowerClosedFlags(ctx.db, ctx.admin, ctx.now);
+  assert.equal(result.published, 1);
+  assert.equal(result.lowered, 0);
+  assert.equal(result.errors, 0);
+  assert.equal(ctx.writes.length, 3);
+  assert.deepEqual(ctx.writes[0].data.liveFlag, {
+    flagColor: "yellow",
+    flagPosition: "affale",
+    purpleFlagActive: true,
+    windsockActive: true,
+  });
+  assert.equal(ctx.writes[0].data.preparedFlag, "deleted");
+  assert.equal(ctx.writes[1].data.type, "Drapeau");
+  assert.equal(ctx.writes[1].data.createdBy.role, "SYSTÈME");
+  assert.match(ctx.writes[1].data.description, /aucun hissage/);
+  assert.equal(ctx.writes[2].data.source,
+      "scheduled_preparation_publication");
+});
 
 test("affalage automatique à la fermeture : état, auteur, audit", async () => {
   const ctx = fixture({now: new Date("2026-11-13T18:00:00Z")});

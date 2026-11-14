@@ -32,6 +32,41 @@ test("heure de surveillance Admin: ouverture à 11h, fermeture à 19h", () => {
   assert.equal(closed.open, false);
 });
 
+test("LONGE 09 : heures 11h00 à 19h00 acceptées à 11h56", () => {
+  const legacy = {
+    ...period,
+    startHour: "11h00",
+    endHour: "19h00",
+  };
+  const at1156 = new Date("2026-11-14T10:56:00Z");
+  const open = surveillanceWindow(spot, [legacy], at1156);
+  assert.equal(open.configured, true);
+  assert.equal(open.open, true);
+  assert.equal(open.closesAt.toISOString(), "2026-11-14T18:00:00.000Z");
+
+  const at1059 = surveillanceWindow(
+      spot, [legacy], new Date("2026-11-14T09:59:00Z"));
+  assert.equal(at1059.open, false);
+  const at1900 = surveillanceWindow(
+      spot, [legacy], new Date("2026-11-14T18:00:00Z"));
+  assert.equal(at1900.open, false);
+});
+
+test("les formats HH:mm et HHhmm produisent le même horaire", () => {
+  for (const startHour of ["11:00", "11h00", "11H00"]) {
+    const evaluation = surveillanceWindow(
+        spot, [{...period, startHour}],
+        new Date("2026-11-14T10:56:00Z"),
+    );
+    assert.equal(evaluation.open, true);
+  }
+  const invalid = surveillanceWindow(
+      spot, [{...period, startHour: "25h00"}],
+      new Date("2026-11-14T10:56:00Z"),
+  );
+  assert.equal(invalid.open, false);
+});
+
 test("ne prend pas les périodes non attribuées au poste", () => {
   const selection = surveillanceWindow(
       {periodesSurveillance: ["AUTRE PÉRIODE"]},

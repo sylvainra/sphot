@@ -246,12 +246,22 @@ class _SauveteurActionsRapidesPageState
       final liveFlag = data['liveFlag'] is Map
           ? Map<String, dynamic>.from(data['liveFlag'] as Map)
           : <String, dynamic>{};
+      final preparation = data['preparedFlag'] is Map
+          ? Map<String, dynamic>.from(data['preparedFlag'] as Map)
+          : <String, dynamic>{};
 
-      final rawColor = (liveFlag['flagColor'] ?? '').toString().toLowerCase();
+      // Les commandes sauveteur affichent la préparation ; la carte
+      // publique ne reçoit toujours que les données liveFlag.
+      final displayedFlag = preparation['pending'] == true
+          ? preparation : liveFlag;
+      final rawColor =
+          (displayedFlag['flagColor'] ?? '').toString().toLowerCase();
       final rawPosition =
-          (liveFlag['flagPosition'] ?? '').toString().toLowerCase();
-      final nextPurpleFlagActive = liveFlag['purpleFlagActive'] == true;
-      final nextWindsockActive = liveFlag['windsockActive'] == true;
+          (displayedFlag['flagPosition'] ?? '').toString().toLowerCase();
+      final nextPurpleFlagActive =
+          displayedFlag['purpleFlagActive'] == true;
+      final nextWindsockActive =
+          displayedFlag['windsockActive'] == true;
 
       String? nextColor;
       if (rawColor == 'green' || rawColor == 'vert') {
@@ -383,10 +393,24 @@ class _SauveteurActionsRapidesPageState
       }
 
       String errorCode = '';
+      String serverTimeUtc = '';
+      String periodsDiagnostic = '';
       try {
         final decoded = jsonDecode(response.body);
         if (decoded is Map<String, dynamic>) {
           errorCode = (decoded['error'] ?? '').toString();
+          serverTimeUtc =
+              (decoded['serverTimeUtc'] ?? '').toString();
+          final periods = decoded['periods'];
+          if (periods is List) {
+            periodsDiagnostic = periods
+                .whereType<Map>()
+                .map((period) =>
+                    '${period['startHour'] ?? '--'}-'
+                    '${period['endHour'] ?? '--'} '
+                    '${period['timeZone'] ?? ''}')
+                .join(', ');
+          }
         }
       } catch (_) {}
 
@@ -417,8 +441,11 @@ class _SauveteurActionsRapidesPageState
             break;
           case 'surveillance_closed':
             _liveStatusMessage =
-                'Manœuvre refusée : le poste est hors des horaires '
-                'de surveillance définis par SPHOT Admin.';
+                'Hissage refusé : horaire non reconnu par le serveur. '
+                'Heure serveur UTC : '
+                '${serverTimeUtc.isEmpty ? "inconnue" : serverTimeUtc}. '
+                'Périodes associées : '
+                '${periodsDiagnostic.isEmpty ? "aucune" : periodsDiagnostic}.';
             break;
           case 'surveillance_schedule_missing':
             _liveStatusMessage =

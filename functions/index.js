@@ -7494,6 +7494,9 @@ exports.updateSauveteurLiveState = onRequest(
           const spotSnapshot = await transaction.get(spotReference);
           const previousSpot = spotSnapshot.data() || {};
           const previousLiveFlag = previousSpot.liveFlag || {};
+          const previousPreparedFlag = previousSpot.preparedFlag &&
+              previousSpot.preparedFlag.pending === true ?
+                previousSpot.preparedFlag : null;
           const auditReference = db
               .collection("sauveteurOperationalAudit").doc();
 
@@ -7503,8 +7506,11 @@ exports.updateSauveteurLiveState = onRequest(
               .collection("spots")
               .doc(spotId);
           const nextLiveFlag = sanitizedChanges.liveFlag;
+          const previousEffectiveFlag =
+            previousPreparedFlag || previousLiveFlag;
           const flagTransition = nextLiveFlag === undefined ?
-            null : evaluateFlagTransition(previousLiveFlag, nextLiveFlag);
+            null : evaluateFlagTransition(
+                previousEffectiveFlag, nextLiveFlag);
           if (flagTransition && flagTransition.error) {
             const rejected = new Error(flagTransition.error);
             rejected.httpStatus =
@@ -7513,13 +7519,10 @@ exports.updateSauveteurLiveState = onRequest(
           }
 
           let territorySpot = {};
-          if (flagTransition && flagTransition.requiresOpenSurveillance) {
+          if (flagTransition) {
             const territorySpotSnapshot =
               await transaction.get(territoireSpotReference);
             territorySpot = territorySpotSnapshot.data() || {};
-          }
-
-          if (flagTransition && flagTransition.requiresOpenSurveillance) {
             const periodsSnapshot = await transaction.get(
                 db.collection("territoires")
                     .doc(context.territoireId)
@@ -7529,16 +7532,96 @@ exports.updateSauveteurLiveState = onRequest(
               id: period.id,
               ...period.data(),
             }));
+            const now = new Date();
             const schedule = surveillanceWindow(
-                territorySpot, periods, new Date(),
+                territorySpot, periods, now,
             );
+
             if (!schedule.open) {
-              const denied = new Error(
-                  schedule.configured ?
-                    "surveillance_closed" : "surveillance_schedule_missing",
-              );
-              denied.httpStatus = 409;
-              throw denied;
+              // Hors horaires : préparation sans diffusion publique.
+              // Un hissage ne peut jamais être préparé à l'avance.
+              const position = (nextLiveFlag.flagPosition || "")
+                  .toString().trim().toLowerCase();
+              if (position !== "affale" && position !== "affalé") {
+                const denied = new Error(schedule.configured ?
+                  "surveillance_closed" : "surveillance_schedule_missing");
+                denied.httpStatus = 409;
+                denied.serverTimeUtc = now.toISOString();
+                denied.periods = periods.filter((period) =>
+                  (territorySpot.periodesSurveillanceIds || [])
+                      .includes(period.id) ||
+                  (territorySpot.periodesSurveillance || [])
+                      .includes(period.label)).map((period) => ({
+                  startHour: period.startHour,
+                  endHour: period.endHour,
+                  timeZone: period.timeZone || "Europe/Paris",
+                }));
+                throw denied;
+              }
+
+              const time = admin.firestore.FieldValue.serverTimestamp();
+              const preparedFlag = {
+                flagColor: nextLiveFlag.flagColor,
+                flagPosition: "affale",
+                purpleFlagActive: nextLiveFlag.purpleFlagActive === true,
+                windsockActive: nextLiveFlag.windsockActive === true,
+                pending: true,
+                preparedAt: time,
+                preparedBy: {
+                  sauveteurId: context.sauveteurId,
+                  login: session.login,
+                  role: context.userRole,
+                },
+              };
+
+              // Le drapeau principal est AFFALÉ par défaut, y compris
+              // le premier jour, sans diffuser la couleur préparée.
+              const publicDefault = !previousLiveFlag.flagPosition ?
+                {liveFlag: {
+                  flagColor: "green",
+                  flagPosition: "affale",
+                  purpleFlagActive: false,
+                  windsockActive: false,
+                }} : {};
+
+              transaction.set(spotReference, {
+                ...publicDefault,
+                preparedFlag,
+                updatedAt: time,
+              }, {merge: true});
+              transaction.set(auditReference, {
+                territoireId: context.territoireId,
+                spotId,
+                sauveteurId: context.sauveteurId,
+                login: session.login,
+                role: context.userRole,
+                changes: {preparedFlag},
+                source: "flag_preparation",
+                createdAt: time,
+              });
+              if (flagTransition.journalLines.length > 0) {
+                const reference = territoireSpotReference
+                    .collection("mainCourante").doc();
+                transaction.set(reference, {
+                  type: "Drapeau",
+                  description: "Préparation hors horaires, non diffusée : " +
+                    flagTransition.journalLines.join(" • "),
+                  actionTaken: "Préparation des signaux SPHOT",
+                  visibility: "operational",
+                  occurredAt: time,
+                  createdAt: time,
+                  createdBy: preparedFlag.preparedBy,
+                  source: "flag_preparation",
+                  immutableOriginal: true,
+                });
+              }
+              return {flagWasLowered: false, operationalAlertMessage: ""};
+            }
+
+            // Une manœuvre pendant la plage ouverte consomme la préparation.
+            if (previousPreparedFlag) {
+              sanitizedChanges.preparedFlag =
+                admin.firestore.FieldValue.delete();
             }
           }
 
@@ -7689,6 +7772,9 @@ exports.updateSauveteurLiveState = onRequest(
           response.status(error.httpStatus).json({
             success: false,
             error: error.message,
+            ...(error.serverTimeUtc ?
+              {serverTimeUtc: error.serverTimeUtc} : {}),
+            ...(error.periods ? {periods: error.periods} : {}),
           });
           return;
         }

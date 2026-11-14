@@ -16,7 +16,9 @@ const HISSE_VALUES = ["hisse", "hissé", "Hissé", "Hisse"];
  * @return {Promise<Object>} Résultats à journaliser.
  */
 async function autoLowerClosedFlags(firestore, admin, now = new Date()) {
-  const statistics = {inspected: 0, lowered: 0, errors: 0, skipped: 0};
+  const statistics = {
+    inspected: 0, lowered: 0, published: 0, errors: 0, skipped: 0,
+  };
   const db = firestore;
   const seenSpots = new Set();
 
@@ -26,6 +28,7 @@ async function autoLowerClosedFlags(firestore, admin, now = new Date()) {
     ["liveFlag.flagPosition", "in", HISSE_VALUES],
     ["liveFlag.purpleFlagActive", "==", true],
     ["liveFlag.windsockActive", "==", true],
+    ["preparedFlag.pending", "==", true],
   ];
 
   for (const [field, operator, value] of filters) {
@@ -65,7 +68,7 @@ async function autoLowerClosedFlags(firestore, admin, now = new Date()) {
           const preview = surveillanceWindow(
               spotSnapshot.data() || {}, periods, now,
           );
-          if (preview.open) {
+          if (preview.open && root.preparedFlag?.pending !== true) {
             statistics.skipped++;
             continue;
           }
@@ -76,20 +79,66 @@ async function autoLowerClosedFlags(firestore, admin, now = new Date()) {
             const rootSnapshot = await transaction.get(candidate.ref);
             const freshSpot = await transaction.get(territorySpotRef);
             const freshPeriods = await transaction.get(periodsRef);
-            const live = (rootSnapshot.data() || {}).liveFlag || {};
+            const rootData = rootSnapshot.data() || {};
+            const live = rootData.liveFlag || {};
+            const prepared = rootData.preparedFlag || {};
             const raised = HISSE_VALUES.includes(
                 (live.flagPosition || "").toString(),
             );
             const purple = live.purpleFlagActive === true;
             const windsock = live.windsockActive === true;
-            if (!raised && !purple && !windsock) return null;
 
             const currentPeriod = surveillanceWindow(
                 freshSpot.data() || {},
                 freshPeriods.docs.map((doc) => ({id: doc.id, ...doc.data()})),
                 now,
             );
+            if (currentPeriod.open && prepared.pending === true) {
+              const time = admin.firestore.FieldValue.serverTimestamp();
+              const published = {
+                flagColor: prepared.flagColor,
+                flagPosition: "affale",
+                purpleFlagActive: prepared.purpleFlagActive === true,
+                windsockActive: prepared.windsockActive === true,
+              };
+              // Début d'horaire : publication de la préparation,
+              // sans aucun hissage automatique du drapeau principal.
+              transaction.set(candidate.ref, {
+                liveFlag: published,
+                preparedFlag: admin.firestore.FieldValue.delete(),
+                statutBaignade: "Baignade non surveillée temporairement",
+                updatedAt: time,
+                liveUpdatedAt: time,
+              }, {merge: true});
+              transaction.set(journalRef, {
+                type: "Drapeau",
+                description: "Signaux préparés rendus visibles à " +
+                  "l'ouverture programmée. Drapeau principal affalé ; " +
+                  "aucun hissage physique présumé.",
+                actionTaken: "Publication de la préparation SPHOT",
+                visibility: "operational",
+                occurredAt: time,
+                createdAt: time,
+                createdBy: {
+                  role: "SYSTÈME",
+                  displayName: "SPHOT (automatique)",
+                },
+                source: "scheduled_preparation_publication",
+                immutableOriginal: true,
+              });
+              transaction.set(auditRef, {
+                territoireId: territoryId,
+                spotId: candidate.id,
+                role: "SYSTÈME",
+                login: "SPHOT_AUTO",
+                changes: {liveFlag: published},
+                source: "scheduled_preparation_publication",
+                createdAt: time,
+              });
+              return {mode: "published"};
+            }
             if (currentPeriod.open) return null;
+            if (!raised && !purple && !windsock) return null;
 
             const spotInfo = freshSpot.data() || {};
             const label = (
@@ -157,10 +206,11 @@ async function autoLowerClosedFlags(firestore, admin, now = new Date()) {
               source: "automatic_surveillance_closure",
               createdAt: nowServer,
             });
-            return {label};
+            return {mode: "lowered", label};
           });
 
-          if (signal) statistics.lowered++;
+          if (signal?.mode === "published") statistics.published++;
+          else if (signal?.mode === "lowered") statistics.lowered++;
           else statistics.skipped++;
         } catch (error) {
           statistics.errors++;

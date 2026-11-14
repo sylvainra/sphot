@@ -114,6 +114,8 @@ jobs:
             lib/pages/sauveteur/sauveteur_actions_rapides_page.dart \
             lib/pages/admin/admin_attribution_sphot_page.dart \
             test/sauveteur_flag_rules_test.dart \
+            test/sauveteur_preparation_rules_test.dart \
+            lib/models/flag_state.dart \
             lib/pages/sauveteur/sauveteur_verification_author.dart \
             test/sauveteur_verification_feedback_test.dart \
             test/sauveteur_verification_author_test.dart \
@@ -123,6 +125,6 @@ jobs:
             test/legal_published_version_test.dart \
             test/admin_legal_placement_test.dart
       - name: Tester les versions juridiques Flutter
-        run: flutter test --no-pub test/legal_published_version_test.dart test/admin_legal_placement_test.dart test/sauveteur_verification_feedback_test.dart test/sauveteur_verification_author_test.dart test/sauveteur_flag_rules_test.dart
+        run: flutter test --no-pub test/legal_published_version_test.dart test/admin_legal_placement_test.dart test/sauveteur_verification_feedback_test.dart test/sauveteur_verification_author_test.dart test/sauveteur_flag_rules_test.dart test/sauveteur_preparation_rules_test.dart
       - name: Construire Web sans publier
         run: flutter build web --release --no-pub -t lib/main.dart
