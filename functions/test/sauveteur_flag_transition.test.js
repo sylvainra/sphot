@@ -251,6 +251,9 @@ test("le serveur vérifie les horaires pour toute manœuvre active", () => {
   );
   const handler = source.split("exports.updateSauveteurLiveState =")[1]
       .split("exports.")[0];
-  assert.match(handler, /flagTransition\.requiresOpenSurveillance/);
+  assert.match(handler, /if \(flagTransition\)/);
   assert.match(handler, /surveillanceWindow\(/);
+  assert.match(handler, /if \(!schedule\.open\)/);
+  assert.match(handler, /preparedFlag/);
+  assert.match(handler, /"flag_preparation"/);
 });
