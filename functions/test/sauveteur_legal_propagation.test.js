@@ -119,6 +119,8 @@ test("connexion SAUVETEUR : le navigateur est refusé, Android préservé", () =
       "", false), false);
   assert.equal(shouldRejectSauveteurBrowserLogin(
       "https://sphot.app", true), false);
+  assert.equal(shouldRejectSauveteurBrowserLogin(
+      undefined, true), true);
 
   const start = source.indexOf("async function handleSauveteurLogin(");
   const end = source.indexOf("exports.loginSauveteur =", start);

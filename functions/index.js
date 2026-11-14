@@ -5569,7 +5569,8 @@ exports.resolveLoginIdentity = onRequest(
         if (sauveteurSnapshot.exists) {
           const data = sauveteurSnapshot.data() || {};
           if (data.accountStatus === "ACTIVE") {
-            accountTypes.push("SAUVETEUR");
+            accountTypes.push(isSuperAdminAccount(data) ?
+              "SUPER_ADMIN" : "SAUVETEUR");
           }
         }
 
@@ -5595,9 +5596,13 @@ exports.resolveLoginIdentity = onRequest(
           return;
         }
 
+        // Le Super Admin relève exclusivement du portail Web, même
+        // si son compte historique est dans sauveteurAccounts.
+        const resolvedTypes = accountTypes.includes("SUPER_ADMIN") ?
+          ["SUPER_ADMIN"] : accountTypes;
         response.status(200).json({
           success: true,
-          accountTypes,
+          accountTypes: resolvedTypes,
         });
       } catch (error) {
         console.error("Erreur résolution identifiant SPHOT:", error);
@@ -5677,9 +5682,9 @@ async function handleSauveteurLogin(request, response, pilot = false) {
       return;
     }
 
-    // Un compte SAUVETEUR ne peut pas ouvrir de session depuis le Web.
-    // Le Super Admin conserve son parcours historique de connexion Web.
-    // Origin filtre le navigateur courant, sans attester un appareil Android.
+    // Sauveteur : application uniquement. Super Admin : Web uniquement.
+    // Origin distingue le navigateur courant du client HTTP natif, mais
+    // n'atteste pas cryptographiquement la plateforme.
     if (shouldRejectSauveteurBrowserLogin(
         request.get("origin"), isSuperAdminAccount(data))) {
       if (attempt) await attempt.clear();

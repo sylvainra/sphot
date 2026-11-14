@@ -96,6 +96,7 @@ class _ProfilLoginPageState extends State<ProfilLoginPage> {
   bool get _hasAdmin => _accountTypes.contains('ADMIN');
   bool get _hasAdvertiser => _accountTypes.contains('ANNONCEUR');
   bool get _hasSauveteur => _accountTypes.contains('SAUVETEUR');
+  bool get _hasSuperAdmin => _accountTypes.contains('SUPER_ADMIN');
   bool get _hasProfessionalAccount => _hasAdmin || _hasAdvertiser;
 
   // Le lien CGU de connexion suit le profil choisi, pas les CGU communes.
@@ -182,6 +183,37 @@ class _ProfilLoginPageState extends State<ProfilLoginPage> {
         setState(() {
           _errorMessage = 'Identifiant inconnu ou compte indisponible. '
               'Vérifiez votre saisie ou contactez votre administrateur.';
+        });
+        return;
+      }
+
+      // Contrôle AVANT la saisie du mot de passe.
+      final hasProfessional = accountTypes.contains('ADMIN') ||
+          accountTypes.contains('ANNONCEUR');
+      final superAdmin = accountTypes.contains('SUPER_ADMIN');
+
+      if (kIsWeb && accountTypes.contains('SAUVETEUR') &&
+          !hasProfessional && !superAdmin) {
+        if (!mounted) return;
+        setState(() {
+          _step = 0;
+          _accountTypes = accountTypes;
+          _passwordController.clear();
+          _errorMessage =
+              'SPHOT SAUVETEUR est réservé à l’application mobile SPHOT.';
+        });
+        return;
+      }
+
+      if (!kIsWeb &&
+          (superAdmin || !accountTypes.contains('SAUVETEUR'))) {
+        if (!mounted) return;
+        setState(() {
+          _step = 0;
+          _accountTypes = accountTypes;
+          _passwordController.clear();
+          _errorMessage =
+              'Ce compte est réservé au site Web https://sphot.app.';
         });
         return;
       }
@@ -307,7 +339,14 @@ class _ProfilLoginPageState extends State<ProfilLoginPage> {
     try {
       Map<String, dynamic>? decoded;
 
-      if (_hasProfessionalAccount) {
+      if (kIsWeb && _hasSuperAdmin) {
+        // SUPER ADMIN = Web, même dans sauveteurAccounts.
+        decoded = await _tryLogin(
+          endpoint: 'loginSauveteur',
+          login: login,
+          password: password,
+        );
+      } else if (kIsWeb && _hasProfessionalAccount) {
         switch (_selectedAudience) {
           case _LoginAudience.admin:
             decoded = await _tryLogin(
@@ -326,34 +365,20 @@ class _ProfilLoginPageState extends State<ProfilLoginPage> {
           case null:
             break;
         }
-
-        /*
-         * Un Super Admin peut être enregistré dans le circuit sauveteur.
-         * S'il possède aussi une adresse utilisée côté professionnel,
-         * on conserve la reconnaissance historique sans lui imposer
-         * une page de connexion dédiée.
-         */
-        if (decoded == null && _hasSauveteur && !sphotPasswordPilotMode) {
-          final potentialSuperAdmin = await _tryLogin(
-            endpoint: 'loginSauveteur',
-            login: login,
-            password: password,
-          );
-
-          if (potentialSuperAdmin != null &&
-              (potentialSuperAdmin['userRole'] ?? '')
-                      .toString()
-                      .toUpperCase() ==
-                  'SUPER_ADMIN') {
-            decoded = potentialSuperAdmin;
-          }
-        }
-      } else if (_hasSauveteur) {
+      } else if (!kIsWeb && _hasSauveteur) {
         decoded = await _tryLogin(
           endpoint: 'loginSauveteur',
           login: login,
           password: password,
         );
+      } else {
+        if (!mounted) return;
+        setState(() {
+          _errorMessage = kIsWeb
+              ? 'SPHOT SAUVETEUR est réservé à l’application mobile SPHOT.'
+              : 'Ce compte est réservé au site Web https://sphot.app.';
+        });
+        return;
       }
 
       if (decoded == null) {
@@ -368,6 +393,14 @@ class _ProfilLoginPageState extends State<ProfilLoginPage> {
           (decoded['userRole'] ?? '').toString().toUpperCase();
 
       if (userRole == 'SUPER_ADMIN') {
+        if (!kIsWeb) {
+          if (!mounted) return;
+          setState(() {
+            _errorMessage =
+                'SPHOT SUPER ADMIN est réservé au site Web https://sphot.app.';
+          });
+          return;
+        }
         await _openSuperAdmin(decoded);
         return;
       }
