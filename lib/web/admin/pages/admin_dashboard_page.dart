@@ -4581,6 +4581,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final today = DateTime(now.year, now.month, now.day);
 
     bool hasCurrentPeriod = false;
+    bool hasOpenHours = false;
     bool hasFuturePeriod = false;
     bool hasPastPeriod = false;
 
@@ -4601,6 +4602,24 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
       if (!today.isBefore(start) && !today.isAfter(end)) {
         hasCurrentPeriod = true;
+        final startHour = _parseSurveillanceTime(period['startHour']);
+        final endHour = _parseSurveillanceTime(period['endHour']);
+        final secondStart =
+            _parseSurveillanceTime(period['secondStartHour']);
+        final secondEnd = _parseSurveillanceTime(period['secondEndHour']);
+        final currentMinute = now.hour * 60 + now.minute;
+
+        bool within(TimeOfDay? from, TimeOfDay? to) {
+          if (from == null || to == null) return false;
+          final first = from.hour * 60 + from.minute;
+          final last = to.hour * 60 + to.minute;
+          return first <= currentMinute && currentMinute < last;
+        }
+
+        if (within(startHour, endHour) ||
+            within(secondStart, secondEnd)) {
+          hasOpenHours = true;
+        }
       } else if (start.isAfter(today)) {
         hasFuturePeriod = true;
       } else if (end.isBefore(today)) {
@@ -4608,8 +4627,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       }
     }
 
+    if (hasOpenHours) {
+      return 'HORAIRES DE SURVEILLANCE EN COURS';
+    }
     if (hasCurrentPeriod) {
-      return 'SURVEILLANCE EN COURS';
+      return 'HORS HORAIRES DE SURVEILLANCE';
     }
 
     if (hasFuturePeriod) {
@@ -4625,8 +4647,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
   Color _trialSeasonStatusColor(String status) {
     switch (status) {
-      case 'SURVEILLANCE EN COURS':
+      case 'HORAIRES DE SURVEILLANCE EN COURS':
         return const Color(0xFF16A34A);
+      case 'HORS HORAIRES DE SURVEILLANCE':
+        return const Color(0xFFF59E0B);
       case 'OUVERTURE PROGRAMMÉE':
         return const Color(0xFFF59E0B);
       case 'HORS SAISON':
@@ -7433,7 +7457,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       return null;
     }
 
-    final parts = rawValue.split(':');
+    // Compatibilité avec les anciennes heures Firestore "11h00".
+    final parts = rawValue.replaceAll(RegExp(r'[hH]'), ':').split(':');
 
     if (parts.isEmpty) {
       return null;
