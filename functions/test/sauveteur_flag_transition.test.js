@@ -122,28 +122,97 @@ test("transaction atomique, auteur et droits restent présents", () => {
   assert.match(handler, /flag_color_requires_lowered/);
 });
 
-test("toutes les manœuvres manuelles exigent des horaires ouverts", () => {
-  const state = {
-    flagColor: "green", flagPosition: "affale",
-    purpleFlagActive: false, windsockActive: false,
-  };
-  const changes = [
-    {...state, flagColor: "yellow"},
-    {...state, flagPosition: "hisse"},
-    {...state, purpleFlagActive: true},
-    {...state, windsockActive: true},
-  ];
-  for (const next of changes) {
-    assert.equal(
-        evaluateFlagTransition(state, next).requiresOpenSurveillance, true,
-    );
+test("hors horaires : changement de couleur toujours possible affalé", () => {
+  const colors = ["green", "yellow", "red"];
+  for (const from of colors) {
+    for (const to of colors) {
+      if (to === from) continue;
+      const transition = evaluateFlagTransition(
+          {flagColor: from, flagPosition: "affale"},
+          {flagColor: to, flagPosition: "affale"},
+      );
+      assert.equal(transition.error, undefined);
+      assert.equal(transition.requiresOpenSurveillance, false);
+      assert.equal(transition.journalLines.length, 1);
+      assert.match(transition.journalLines[0], /Couleur du drapeau :/);
+      assert.equal(transition.flagWasRaised, false);
+    }
   }
-  const hissed = {...state, flagPosition: "hisse"};
-  assert.equal(evaluateFlagTransition(hissed, state)
-      .requiresOpenSurveillance, true);
-  assert.equal(evaluateFlagTransition(state, state)
-      .requiresOpenSurveillance, false);
 });
+
+test("hors horaires : affalage autorisé et écrit dans la main courante", () => {
+  for (const color of ["green", "yellow", "red"]) {
+    const transition = evaluateFlagTransition(
+        {flagColor: color, flagPosition: "hisse"},
+        {flagColor: color, flagPosition: "affale"},
+    );
+    assert.equal(transition.error, undefined);
+    assert.equal(transition.requiresOpenSurveillance, false);
+    assert.equal(transition.flagWasLowered, true);
+    assert.deepEqual(transition.journalLines, [
+      "Position du drapeau : Hissé → Affalé",
+    ]);
+  }
+});
+
+test("horaires ouverts requis : tous hissages et signaux activés", () => {
+  for (const color of ["green", "yellow", "red"]) {
+    const previous = {
+      flagColor: color, flagPosition: "affale",
+      purpleFlagActive: false, windsockActive: false,
+    };
+    const transitions = [
+      {...previous, flagPosition: "hisse"},
+      {...previous, purpleFlagActive: true},
+      {...previous, windsockActive: true},
+    ];
+    for (const next of transitions) {
+      const result = evaluateFlagTransition(previous, next);
+      assert.equal(result.error, undefined);
+      assert.equal(result.requiresOpenSurveillance, true);
+      assert.ok(result.journalLines.length > 0);
+    }
+  }
+});
+
+test("hors horaires : désactivations, initialisation affalée et aucun changement", () => {
+  const previous = {
+    flagColor: "red", flagPosition: "affale",
+    purpleFlagActive: true, windsockActive: true,
+  };
+  const disabled = evaluateFlagTransition(previous, {
+    ...previous, purpleFlagActive: false, windsockActive: false,
+  });
+  assert.equal(disabled.requiresOpenSurveillance, false);
+  assert.deepEqual(disabled.journalLines, [
+    "Drapeau violet : Désactivé",
+    "Manche à air : Désactivée",
+  ]);
+  const initialized = evaluateFlagTransition({}, {
+    flagColor: "yellow", flagPosition: "affale",
+  });
+  assert.equal(initialized.requiresOpenSurveillance, false);
+  const same = evaluateFlagTransition(previous, previous);
+  assert.equal(same.requiresOpenSurveillance, false);
+  assert.deepEqual(same.journalLines, []);
+});
+
+test("activation et changement de couleur combinés exigent horaires ouverts",
+    () => {
+      const previous = {
+        flagColor: "green", flagPosition: "affale",
+        purpleFlagActive: false, windsockActive: false,
+      };
+      const result = evaluateFlagTransition(previous, {
+        ...previous, flagColor: "yellow", purpleFlagActive: true,
+      });
+      assert.equal(result.error, undefined);
+      assert.equal(result.requiresOpenSurveillance, true);
+      assert.deepEqual(result.journalLines, [
+        "Couleur du drapeau : Vert → Jaune",
+        "Drapeau violet : Activé",
+      ]);
+    });
 
 test("désactivation violette et manche à air autorisée hors horaires", () => {
   const prior = {
@@ -159,6 +228,21 @@ test("désactivation violette et manche à air autorisée hors horaires", () => 
     "Drapeau violet : Désactivé",
     "Manche à air : Désactivée",
   ]);
+});
+
+test("journalisation serveur : les changements validés restent atomiques", () => {
+  const source = fs.readFileSync(
+      path.join(__dirname, "../index.js"), "utf8",
+  );
+  const handler = source.split("exports.updateSauveteurLiveState =")[1]
+      .split("exports.")[0];
+  assert.match(handler, /flagTransition\.journalLines/);
+  assert.match(handler, /if \(flagJournalLines\.length > 0\)/);
+  assert.match(handler, /type: "Drapeau"/);
+  assert.match(handler, /source: "automatic_flag_event"/);
+  assert.match(handler, /transaction\.set\(mainCouranteReference/);
+  assert.match(handler, /createdBy: \{/);
+  assert.match(handler, /login: session\.login/);
 });
 
 test("le serveur vérifie les horaires pour toute manœuvre active", () => {
