@@ -54,7 +54,6 @@ function evaluateFlagTransition(previous, next) {
     return {error: "flag_color_requires_lowered"};
   }
 
-  const positionChanged = oldPosition !== newPosition;
   const oldPurple = previous && previous.purpleFlagActive === true;
   const oldWindsock = previous && previous.windsockActive === true;
   const newPurple = typeof next.purpleFlagActive === "boolean" ?
