@@ -175,8 +175,7 @@ test("horaires ouverts requis : tous hissages et signaux activés", () => {
   }
 });
 
-test("hors horaires : désactivations, initialisation et aucun changement",
-    () => {
+test("hors horaires : désactivations et initialisation", () => {
   const previous = {
     flagColor: "red", flagPosition: "affale",
     purpleFlagActive: true, windsockActive: true,
@@ -231,8 +230,7 @@ test("désactivation violette et manche à air autorisée hors horaires", () => 
   ]);
 });
 
-test("journalisation serveur : les changements validés sont atomiques",
-    () => {
+test("journalisation serveur : changements atomiques", () => {
   const source = fs.readFileSync(
       path.join(__dirname, "../index.js"), "utf8",
   );
