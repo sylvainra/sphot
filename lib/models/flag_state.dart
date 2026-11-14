@@ -346,6 +346,12 @@ class SpotFlagState {
       return FlagColor.none;
     }
 
+    // Premier jour : le principal existe en bas du mât et reste
+    // affalé par défaut, sans déclaration de surveillance active.
+    if (isPosteSecours && (liveFlag == null || liveFlag!.isEmpty)) {
+      return FlagColor.green;
+    }
+
     switch (_readString(liveFlag?['flagColor']).toLowerCase()) {
       case 'green':
       case 'vert':
@@ -366,6 +372,10 @@ class SpotFlagState {
   FlagPosition get flagPosition {
     if (!realtimeAvailable || isRealtimeAwaitingUpdate) {
       return FlagPosition.none;
+    }
+
+    if (isPosteSecours && (liveFlag == null || liveFlag!.isEmpty)) {
+      return FlagPosition.affale;
     }
 
     switch (_readString(liveFlag?['flagPosition']).toLowerCase()) {
