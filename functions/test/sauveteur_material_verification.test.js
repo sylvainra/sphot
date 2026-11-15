@@ -145,6 +145,8 @@ function verificationEndpointFixture(options = {}) {
     onRequest: (_options, handler) => handler,
     admin: {firestore},
     validateMaterialVerification,
+    loadMainCouranteLifecycle: async () =>
+      ({writable: options.closed !== true}),
     resolveSauveteurSession: async () => options.authenticated === false ?
       null : {
         login: "sauveteur-test",
@@ -211,6 +213,7 @@ test("session absente, accord manquant et poste interdit refusés", async () => 
     [{accepted: false}, 403],
     [{mode: "OFF"}, 403],
     [{assigned: false}, 403],
+    [{closed: true}, 403],
   ];
   for (const [options, expectedStatus] of cases) {
     const harness = verificationEndpointFixture(options);
