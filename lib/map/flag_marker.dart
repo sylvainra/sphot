@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -83,6 +84,7 @@ class FlagMarker extends StatefulWidget {
 class _FlagMarkerState extends State<FlagMarker>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
+  Timer? _automaticLoweringTimer;
 
   static const double markerWidth = 70;
   // Conteneur fixe pour maintenir le pied du mât au même endroit sur la carte.
@@ -112,6 +114,46 @@ class _FlagMarkerState extends State<FlagMarker>
 
   static const double flagTopHisse = 18;
 
+  // La date est produite par Firebase dans la transaction de fermeture.
+  // L animation ne change jamais les donnees de surveillance Firestore.
+  DateTime? _automaticLoweringEndAt() {
+    final record = widget.spot.liveFlag?['automaticLoweringVisual'];
+    if (record is! Map) return null;
+    final raw = record['triggeredAt'];
+    DateTime? triggered;
+    if (raw is DateTime) {
+      triggered = raw;
+    } else if (raw is String) {
+      triggered = DateTime.tryParse(raw);
+    } else if (raw != null) {
+      try {
+        final converted = raw.toDate();
+        if (converted is DateTime) triggered = converted;
+      } catch (_) {}
+    }
+    return triggered?.add(const Duration(seconds: 15));
+  }
+
+  void _scheduleAutomaticLoweringEnd() {
+    _automaticLoweringTimer?.cancel();
+    final end = _automaticLoweringEndAt();
+    if (end == null) return;
+    final remaining = end.difference(DateTime.now());
+    if (remaining <= Duration.zero) return;
+    _automaticLoweringTimer = Timer(
+      remaining + const Duration(milliseconds: 30),
+      () {
+        if (mounted) setState(() {});
+      },
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant FlagMarker oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _scheduleAutomaticLoweringEnd();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -120,10 +162,12 @@ class _FlagMarkerState extends State<FlagMarker>
       vsync: this,
       duration: const Duration(milliseconds: 3200),
     )..repeat();
+    _scheduleAutomaticLoweringEnd();
   }
 
   @override
   void dispose() {
+    _automaticLoweringTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -145,10 +189,30 @@ class _FlagMarkerState extends State<FlagMarker>
 
   @override
   Widget build(BuildContext context) {
-    final purpleFlagActive = widget.spot.liveFlag?['purpleFlagActive'] == true;
-    final windsockActive = widget.spot.liveFlag?['windsockActive'] == true;
+    // Cette présentation est déclenchée uniquement par le marqueur créé
+    // par la fonction Firebase de FERMETURE AUTOMATIQUE.
+    // Elle ne modifie aucun état de surveillance ni aucune commande.
+    final visual = widget.spot.liveFlag?['automaticLoweringVisual'];
+    final end = _automaticLoweringEndAt();
+    final isAutomaticClosure = visual is Map && end != null &&
+        widget.spot.realtimeAvailable &&
+        !widget.spot.isRealtimeAwaitingUpdate &&
+        widget.spot.flagPosition == FlagPosition.affale;
+    final showLoweredGroup = isAutomaticClosure &&
+        (end?.isAfter(DateTime.now()) ?? false);
+    final mastCleared = isAutomaticClosure && !showLoweredGroup;
 
-    final hasMainFlag = widget.spot.flagColor != FlagColor.none &&
+    // Pendant les 15 secondes, le groupe vient de l'instantané des signaux
+    // AVANT fermeture, jamais des booléens opérationnels désactivés.
+    final purpleFlagActive = showLoweredGroup
+        ? visual['purpleFlagActive'] == true
+        : (!mastCleared && widget.spot.liveFlag?['purpleFlagActive'] == true);
+    final windsockActive = showLoweredGroup
+        ? visual['windsockActive'] == true
+        : (!mastCleared && widget.spot.liveFlag?['windsockActive'] == true);
+
+    final hasMainFlag = !mastCleared &&
+        widget.spot.flagColor != FlagColor.none &&
         widget.spot.flagPosition != FlagPosition.none;
 
     final isAffale = widget.spot.flagPosition == FlagPosition.affale;

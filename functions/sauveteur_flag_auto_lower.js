@@ -3,6 +3,8 @@
 const {surveillanceWindowForSauveteurs} =
   require("./sauveteur_surveillance_schedule");
 
+const {describeFlagMast} = require("./sauveteur_flag_transition");
+
 const HISSE_VALUES = ["hisse", "hissé", "Hissé", "Hisse"];
 
 /**
@@ -18,7 +20,8 @@ const HISSE_VALUES = ["hisse", "hissé", "Hissé", "Hisse"];
  */
 async function autoLowerClosedFlags(firestore, admin, now = new Date()) {
   const statistics = {
-    inspected: 0, lowered: 0, published: 0, errors: 0, skipped: 0,
+    inspected: 0, lowered: 0, published: 0, statusUpdated: 0,
+    errors: 0, skipped: 0,
   };
   const db = firestore;
   const seenSpots = new Set();
@@ -29,7 +32,10 @@ async function autoLowerClosedFlags(firestore, admin, now = new Date()) {
     ["liveFlag.flagPosition", "in", HISSE_VALUES],
     ["liveFlag.purpleFlagActive", "==", true],
     ["liveFlag.windsockActive", "==", true],
-    ["preparedFlag.pending", "==", true],
+    ["statutBaignade", "in", [
+      "Baignade non surveillée",
+      "Baignade non surveillée temporairement",
+    ]],
   ];
 
   for (const [field, operator, value] of filters) {
@@ -72,7 +78,8 @@ async function autoLowerClosedFlags(firestore, admin, now = new Date()) {
               assignedSnapshot.docs.map((doc) => doc.data() || {}),
               periods, now, (spotSnapshot.data() || {}).timeZone,
           );
-          if (preview.open && root.preparedFlag?.pending !== true) {
+          if (preview.open &&
+              root.statutBaignade !== "Baignade non surveillée") {
             statistics.skipped++;
             continue;
           }
@@ -86,7 +93,6 @@ async function autoLowerClosedFlags(firestore, admin, now = new Date()) {
             const freshAssigned = await transaction.get(assignedRef);
             const rootData = rootSnapshot.data() || {};
             const live = rootData.liveFlag || {};
-            const prepared = rootData.preparedFlag || {};
             const raised = HISSE_VALUES.includes(
                 (live.flagPosition || "").toString(),
             );
@@ -98,52 +104,35 @@ async function autoLowerClosedFlags(firestore, admin, now = new Date()) {
                 freshPeriods.docs.map((doc) => ({id: doc.id, ...doc.data()})),
                 now, (freshSpot.data() || {}).timeZone,
             );
-            if (currentPeriod.open && prepared.pending === true) {
-              const time = admin.firestore.FieldValue.serverTimestamp();
-              const published = {
-                flagColor: prepared.flagColor,
-                flagPosition: "affale",
-                purpleFlagActive: prepared.purpleFlagActive === true,
-                windsockActive: prepared.windsockActive === true,
-              };
-              // Début d'horaire : publication de la préparation,
-              // sans aucun hissage automatique du drapeau principal.
+            // Aucun signal n'est hissé automatiquement à l'ouverture.
+            // Seul le libellé du bandeau change si le drapeau est affalé.
+            if (currentPeriod.open) {
+              if (raised ||
+                  rootData.statutBaignade !== "Baignade non surveillée") {
+                return null;
+              }
               transaction.set(candidate.ref, {
-                liveFlag: published,
-                preparedFlag: admin.firestore.FieldValue.delete(),
                 statutBaignade: "Baignade non surveillée temporairement",
-                updatedAt: time,
-                liveUpdatedAt: time,
+                // Réouverture : le pavillon sélectionné redevient visible
+                // AFFALÉ au pied du mât, sans hissage automatique.
+                ...(live.automaticLoweringVisual ? {liveFlag: {
+                  ...live,
+                  automaticLoweringVisual: null,
+                }} : {}),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
               }, {merge: true});
-              transaction.set(journalRef, {
-                type: "Drapeau",
-                description: "Signaux préparés rendus visibles à " +
-                  "l'ouverture programmée. Drapeau principal affalé ; " +
-                  "aucun hissage physique présumé.",
-                actionTaken: "Publication de la préparation SPHOT",
-                visibility: "operational",
-                occurredAt: time,
-                createdAt: time,
-                createdBy: {
-                  role: "SYSTÈME",
-                  displayName: "SPHOT (automatique)",
-                },
-                source: "scheduled_preparation_publication",
-                immutableOriginal: true,
-              });
-              transaction.set(auditRef, {
-                territoireId: territoryId,
-                spotId: candidate.id,
-                role: "SYSTÈME",
-                login: "SPHOT_AUTO",
-                changes: {liveFlag: published},
-                source: "scheduled_preparation_publication",
-                createdAt: time,
-              });
-              return {mode: "published"};
+              return {mode: "status"};
             }
-            if (currentPeriod.open) return null;
-            if (!raised && !purple && !windsock) return null;
+            if (!raised && !purple && !windsock) {
+              if (rootData.statutBaignade === "Baignade non surveillée") {
+                return null;
+              }
+              transaction.set(candidate.ref, {
+                statutBaignade: "Baignade non surveillée",
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              }, {merge: true});
+              return {mode: "status"};
+            }
 
             const spotInfo = freshSpot.data() || {};
             const label = (
@@ -159,17 +148,25 @@ async function autoLowerClosedFlags(firestore, admin, now = new Date()) {
               flagPosition: "affale",
               purpleFlagActive: false,
               windsockActive: false,
+              // Animation visuelle seulement : aucun hissage reel simule.
+              automaticLoweringVisual: {
+                triggeredAt: nowServer,
+                // Instantané des signaux présents AVANT l'affalage.
+                // Les booléens opérationnels deviennent false immédiatement,
+                // mais cet instantané reste dessiné 15 s en position basse.
+                flagColor: live.flagColor || null,
+                mainFlagPresent: Boolean(live.flagColor),
+                purpleFlagActive: purple,
+                windsockActive: windsock,
+              },
             };
-            const descriptions = [];
-            if (raised) {
-              descriptions.push("Position du signal SPHOT : Hissé → Affalé");
-            }
-            if (purple) descriptions.push("Drapeau violet : désactivé");
-            if (windsock) descriptions.push("Manche à air : désactivée");
+            // La main courante décrit TOUS les signaux présents,
+            // y compris le principal s'il était déjà affalé.
+            const mastAtClosure = describeFlagMast(live, true);
 
             transaction.set(candidate.ref, {
               liveFlag: correctedFlag,
-              statutBaignade: "Baignade non surveillée temporairement",
+              statutBaignade: "Baignade non surveillée",
               // Ne pas annoncer un affalage lorsque seul un signal
               // complémentaire vient d'être désactivé.
               ...(raised ? {operationalAlert: {
@@ -187,16 +184,15 @@ async function autoLowerClosedFlags(firestore, admin, now = new Date()) {
 
             transaction.set(journalRef, {
               type: "Drapeau",
-              description: descriptions.join(" • ") +
-                " (automatique, hors surveillance programmée). " +
-                "Ne constitue pas une constatation de manœuvre physique.",
-              actionTaken: "Fermeture automatique programmée par SPHOT",
+              description: mastAtClosure,
+              actionTaken: "",
               visibility: "operational",
               occurredAt: nowServer,
               createdAt: nowServer,
               createdBy: {
                 role: "SYSTÈME",
                 displayName: "SPHOT (automatique)",
+                automaticMainFlagLoweredByAdminSchedule: raised,
               },
               source: "automatic_surveillance_closure",
               immutableOriginal: true,
@@ -214,8 +210,8 @@ async function autoLowerClosedFlags(firestore, admin, now = new Date()) {
             return {mode: "lowered", label};
           });
 
-          if (signal?.mode === "published") statistics.published++;
-          else if (signal?.mode === "lowered") statistics.lowered++;
+          if (signal?.mode === "lowered") statistics.lowered++;
+          else if (signal?.mode === "status") statistics.statusUpdated++;
           else statistics.skipped++;
         } catch (error) {
           statistics.errors++;

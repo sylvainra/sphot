@@ -23,11 +23,12 @@ function fixture({
   now, rootPosition = "hisse", currentPosition = null,
   purple = false, windsock = false, prepared = null,
   assignedPeriodIds = ["p1"],
-  assignedPeriodLists = null, periodData = period,
+  assignedPeriodLists = null, periodData = period, status = null,
 } = {}) {
   const writes = [];
   const spotData = {
     territoireId: "fr-test",
+    statutBaignade: status,
     liveFlag: {
       flagColor: "green", flagPosition: rootPosition,
       purpleFlagActive: purple, windsockActive: windsock,
@@ -71,7 +72,8 @@ function fixture({
                   const key = field.split(".").pop();
                   const state = field.startsWith("preparedFlag.") ?
                     spotData.preparedFlag : spotData.liveFlag;
-                  const current = state && state[key];
+                  const current = field === "statutBaignade" ?
+                    spotData.statutBaignade : state && state[key];
                   const found = operator === "in" ?
                     value.includes(current) : current === value;
                   return {
@@ -111,6 +113,7 @@ function fixture({
                 purpleFlagActive: purple, windsockActive: windsock,
               },
               preparedFlag: prepared ? {...prepared, pending: true} : null,
+              statutBaignade: status,
             })};
           }
           return ref.get();
@@ -132,47 +135,15 @@ function fixture({
   return {db: chain, admin, writes, now};
 }
 
-test("préparation hors horaires : aucune diffusion publique", async () => {
+test("aucune préparation publiée hors horaires", async () => {
   const ctx = fixture({
-    now: new Date("2026-11-14T09:59:00Z"),
-    rootPosition: "affale",
-    prepared: {
-      flagColor: "yellow", purpleFlagActive: true,
-      windsockActive: true,
-    },
+    now: new Date("2026-11-14T09:59:00Z"), rootPosition: "affale",
+    prepared: {flagColor: "yellow"},
   });
   const result = await autoLowerClosedFlags(ctx.db, ctx.admin, ctx.now);
+  assert.equal(result.lowered, 0);
   assert.equal(result.published, 0);
-  assert.equal(result.lowered, 0);
   assert.equal(ctx.writes.length, 0);
-});
-
-test("à 11h00 : préparation publiée sans hissage automatique", async () => {
-  const ctx = fixture({
-    now: new Date("2026-11-14T10:00:00Z"),
-    rootPosition: "affale",
-    prepared: {
-      flagColor: "yellow", purpleFlagActive: true,
-      windsockActive: true,
-    },
-  });
-  const result = await autoLowerClosedFlags(ctx.db, ctx.admin, ctx.now);
-  assert.equal(result.published, 1);
-  assert.equal(result.lowered, 0);
-  assert.equal(result.errors, 0);
-  assert.equal(ctx.writes.length, 3);
-  assert.deepEqual(ctx.writes[0].data.liveFlag, {
-    flagColor: "yellow",
-    flagPosition: "affale",
-    purpleFlagActive: true,
-    windsockActive: true,
-  });
-  assert.equal(ctx.writes[0].data.preparedFlag, "deleted");
-  assert.equal(ctx.writes[1].data.type, "Drapeau");
-  assert.equal(ctx.writes[1].data.createdBy.role, "SYSTÈME");
-  assert.match(ctx.writes[1].data.description, /aucun hissage/);
-  assert.equal(ctx.writes[2].data.source,
-      "scheduled_preparation_publication");
 });
 
 test("affalage automatique à la fermeture : état, auteur, audit", async () => {
@@ -183,6 +154,9 @@ test("affalage automatique à la fermeture : état, auteur, audit", async () => 
   assert.equal(ctx.writes.length, 3);
   const values = ctx.writes.map((write) => write.data);
   assert.equal(values[0].liveFlag.flagPosition, "affale");
+  assert.equal(values[0].statutBaignade, "Baignade non surveillée");
+  assert.match(values[1].description, /^AFFALÉS : VERT$/);
+  assert.equal(values[1].actionTaken, "");
   assert.equal(values[0].liveFlag.purpleFlagActive, false);
   assert.equal(values[0].liveFlag.windsockActive, false);
   assert.equal(values[1].type, "Drapeau");
@@ -204,6 +178,7 @@ test("relecture transactionnelle : aucun doublon après un premier affalage",
       const ctx = fixture({
         now: new Date("2026-11-13T18:00:00Z"),
         currentPosition: "affale",
+        status: "Baignade non surveillée",
       });
       const result = await autoLowerClosedFlags(ctx.db, ctx.admin, ctx.now);
       assert.equal(result.lowered, 0);
@@ -220,7 +195,7 @@ test("fonction planifiée distincte, sans imitation de sauveteur", () => {
   assert.match(closure, /transaction\.set\(journalRef/);
   assert.match(closure, /transaction\.set\(auditRef/);
   assert.match(closure, /transaction\.set\(candidate\.ref/);
-  assert.match(closure, /Ne constitue pas une constatation/);
+  assert.match(closure, /mastAtClosure = describeFlagMast\(live, true\)/);
 });
 
 test("fermeture : coupe violet et manche à air avec drapeau affalé",
@@ -236,8 +211,10 @@ test("fermeture : coupe violet et manche à air avec drapeau affalé",
       assert.equal(ctx.writes[0].data.liveFlag.flagPosition, "affale");
       assert.equal(ctx.writes[0].data.liveFlag.purpleFlagActive, false);
       assert.equal(ctx.writes[0].data.liveFlag.windsockActive, false);
-      assert.match(ctx.writes[1].data.description, /Drapeau violet/);
-      assert.match(ctx.writes[1].data.description, /Manche à air/);
+      assert.match(
+          ctx.writes[1].data.description,
+          /^AFFALÉS : VERT, VIOLET, MANCHE À AIR$/);
+      assert.match(ctx.writes[1].data.description, /MANCHE À AIR/);
     });
 
 test("ne désactive pas les signaux complémentaires avant la fermeture",
@@ -296,4 +273,33 @@ test("automatisme : plusieurs sauveteurs, retrait d'affectation",
       const second = await autoLowerClosedFlags(removed.db, removed.admin, now);
       assert.equal(second.lowered, 1);
       assert.equal(second.errors, 0);
+    });
+
+test("fermeture avec drapeau déjà affalé : seul le bandeau évolue",
+    async () => {
+      const ctx = fixture({
+        now: new Date("2026-11-13T18:00:00Z"),
+        rootPosition: "affale",
+        status: "Baignade non surveillée temporairement",
+      });
+      const r = await autoLowerClosedFlags(ctx.db, ctx.admin, ctx.now);
+      assert.equal(r.lowered, 0);
+      assert.equal(r.statusUpdated, 1);
+      assert.equal(ctx.writes.length, 1);
+      assert.equal(ctx.writes[0].data.statutBaignade,
+          "Baignade non surveillée");
+    });
+
+test("ouverture avec drapeau affalé : retour au bandeau temporaire",
+    async () => {
+      const ctx = fixture({
+        now: new Date("2026-11-13T10:00:00Z"),
+        rootPosition: "affale", status: "Baignade non surveillée",
+      });
+      const r = await autoLowerClosedFlags(ctx.db, ctx.admin, ctx.now);
+      assert.equal(r.lowered, 0);
+      assert.equal(r.statusUpdated, 1);
+      assert.equal(ctx.writes.length, 1);
+      assert.equal(ctx.writes[0].data.statutBaignade,
+          "Baignade non surveillée temporairement");
     });

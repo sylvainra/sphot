@@ -53,6 +53,7 @@ class _SauveteurMainCourantePageState
   final _victimResidenceController = TextEditingController();
   final _victimPhoneController = TextEditingController();
   final _dayScrollController = ScrollController();
+  final _mainCouranteScrollController = ScrollController();
   late stt.SpeechToText _speech;
   String? _listeningFieldKey;
 
@@ -176,11 +177,10 @@ class _SauveteurMainCourantePageState
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_dayScrollController.hasClients) return;
 
-      final desiredOffset = ((_selectedDay.day - 3) * 48.0)
-          .clamp(
-            0.0,
-            _dayScrollController.position.maxScrollExtent,
-          )
+      final centerOfDay = (_selectedDay.day - 1) * 39.0 + 17.0;
+      final viewportWidth = _dayScrollController.position.viewportDimension;
+      final desiredOffset = (centerOfDay - viewportWidth / 2)
+          .clamp(0.0, _dayScrollController.position.maxScrollExtent)
           .toDouble();
 
       _dayScrollController.animateTo(
@@ -272,6 +272,7 @@ class _SauveteurMainCourantePageState
     _victimResidenceController.dispose();
     _victimPhoneController.dispose();
     _dayScrollController.dispose();
+    _mainCouranteScrollController.dispose();
     _speech.stop();
     super.dispose();
   }
@@ -2391,7 +2392,7 @@ class _SauveteurMainCourantePageState
             if (author != 'Non renseigné' || role.isNotEmpty) ...[
               pw.SizedBox(height: 5),
               pw.Text(
-                'Auteur : $author${role.isEmpty ? '' : ' — $role'}',
+                _flagEventAttributionLabel(entry, author, role),
                 style: const pw.TextStyle(
                   fontSize: 7.5,
                   color: PdfColors.grey700,
@@ -3043,6 +3044,22 @@ class _SauveteurMainCourantePageState
     return description;
   }
 
+  String _flagEventAttributionLabel(Map<String, dynamic> entry,
+      String author, String role) {
+    final automaticAuthorMetadata = entry['createdBy'];
+    if (automaticAuthorMetadata is Map &&
+        automaticAuthorMetadata['automaticMainFlagLoweredByAdminSchedule'] == true) {
+      return 'Drapeau affalé automatiquement selon les jours et/ou '
+          'horaires définis par SPHOT ADMIN.';
+    }
+    if ((entry['source'] ?? '').toString().trim() ==
+        'automatic_surveillance_closure') {
+      return 'Déclenchement automatique selon les jours et/ou horaires '
+          'de surveillance enregistrés par SPHOT ADMIN.';
+    }
+    return 'Auteur : $author${role.isEmpty ? '' : ' — $role'}';
+  }
+
   Widget _entryCard(Map<String, dynamic> entry) {
     final createdBy = entry['createdBy'] is Map
         ? Map<String, dynamic>.from(entry['createdBy'] as Map)
@@ -3266,7 +3283,7 @@ class _SauveteurMainCourantePageState
                 if (author != 'Non renseigné' || role.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(
-                    'Auteur : $author${role.isEmpty ? '' : ' — $role'}',
+                    _flagEventAttributionLabel(entry, author, role),
                     style: const TextStyle(
                       color: Colors.black54,
                       fontSize: 10,
@@ -4141,7 +4158,14 @@ class _SauveteurMainCourantePageState
                                 ? const Center(
                                     child: CircularProgressIndicator(),
                                   )
-                                : ListView(
+                                : Scrollbar(
+                                      controller: _mainCouranteScrollController,
+                                      thumbVisibility: true,
+                                      trackVisibility: true,
+                                      thickness: 8,
+                                      radius: const Radius.circular(8),
+                                      child: ListView(
+                                        controller: _mainCouranteScrollController,
                                         children: [
                                           _selectedDayHeader(),
                                           const SizedBox(height: 10),
@@ -4274,6 +4298,7 @@ class _SauveteurMainCourantePageState
                                           ),
                                         ],
                                       ),
+                                    ),
                           ),
                           const SizedBox(height: 8),
                           _dayTabs(),

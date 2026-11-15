@@ -1,8 +1,11 @@
 const {sendSphotMail} = require("./sphot_email_design");
-const {evaluateFlagTransition} = require("./sauveteur_flag_transition");
+const {evaluateFlagTransition, describeFlagManeuver} =
+  require("./sauveteur_flag_transition");
 const {surveillanceWindowForSauveteurs} =
   require("./sauveteur_surveillance_schedule");
 const {autoLowerClosedFlags} = require("./sauveteur_flag_auto_lower");
+const {attachOperationalSpotTerritory} =
+    require("./sauveteur_spot_territory");
 const {shouldRejectSauveteurBrowserLogin} =
     require("./sauveteur_web_access");
 const {setGlobalOptions} = require("firebase-functions");
@@ -4109,6 +4112,13 @@ exports.syncPublicSpotOnWrite = onDocumentWritten(
       if (!event.data.after.exists) {
         await publicReference.delete();
       } else {
+        const territoryStatus = await attachOperationalSpotTerritory(
+            admin.firestore(), territoireId, spotId);
+        if (territoryStatus === "territory_conflict") {
+          console.warn("Operational SPHOT territory conflict; unchanged:", {
+            territoireId, spotId,
+          });
+        }
         // La présence sur la carte est indépendante de l'abonnement.
         await reconcilePublicTerritory(territoireId, true);
       }
@@ -7494,6 +7504,14 @@ exports.updateSauveteurLiveState = onRequest(
         const outcome = await db.runTransaction(async (transaction) => {
           const spotSnapshot = await transaction.get(spotReference);
           const previousSpot = spotSnapshot.data() || {};
+          const operationalTerritoryId =
+              (previousSpot.territoireId || "").toString().trim();
+          if (operationalTerritoryId &&
+              operationalTerritoryId !== context.territoireId) {
+            const denied = new Error("spot_territory_mismatch");
+            denied.httpStatus = 409;
+            throw denied;
+          }
           const previousLiveFlag = previousSpot.liveFlag || {};
           const previousPreparedFlag = previousSpot.preparedFlag &&
               previousSpot.preparedFlag.pending === true ?
@@ -7507,8 +7525,7 @@ exports.updateSauveteurLiveState = onRequest(
               .collection("spots")
               .doc(spotId);
           const nextLiveFlag = sanitizedChanges.liveFlag;
-          const previousEffectiveFlag =
-            previousPreparedFlag || previousLiveFlag;
+          const previousEffectiveFlag = previousLiveFlag;
           const flagTransition = nextLiveFlag === undefined ?
             null : evaluateFlagTransition(
                 previousEffectiveFlag, nextLiveFlag);
@@ -7517,6 +7534,21 @@ exports.updateSauveteurLiveState = onRequest(
             rejected.httpStatus =
               flagTransition.error === "invalid_flag_state" ? 400 : 409;
             throw rejected;
+          }
+
+          // Une demande identique à l'état confirmé n'est pas une manœuvre.
+          if (flagTransition && flagTransition.journalLines.length === 0) {
+            return {flagWasLowered: false, operationalAlertMessage: ""};
+          }
+
+          // Toute manœuvre manuelle annule immédiatement la présentation
+          // visuelle héritée d'une fermeture AUTOMATIQUE précédente.
+          // On ne modifie pas la position ni la couleur confirmées.
+          if (flagTransition) {
+            sanitizedChanges.liveFlag = {
+              ...nextLiveFlag,
+              automaticLoweringVisual: null,
+            };
           }
 
           let territorySpot = {};
@@ -7544,84 +7576,41 @@ exports.updateSauveteurLiveState = onRequest(
                 periods, now, territorySpot.timeZone,
             );
 
-            if (!schedule.open) {
-              // Hors horaires : préparation sans diffusion publique.
-              // Un hissage ne peut jamais être préparé à l'avance.
-              const position = (nextLiveFlag.flagPosition || "")
-                  .toString().trim().toLowerCase();
-              if (position !== "affale" && position !== "affalé") {
-                const denied = new Error(schedule.configured ?
-                  "surveillance_closed" : "surveillance_schedule_missing");
-                denied.httpStatus = 409;
-                denied.serverTimeUtc = now.toISOString();
-                denied.periods = schedule.matchedPeriods.map((period) => ({
-                  startHour: period.startHour,
-                  endHour: period.endHour,
-                  timeZone: period.timeZone || "Europe/Paris",
-                }));
-                throw denied;
-              }
-
-              const time = admin.firestore.FieldValue.serverTimestamp();
-              const preparedFlag = {
-                flagColor: nextLiveFlag.flagColor,
-                flagPosition: "affale",
-                purpleFlagActive: nextLiveFlag.purpleFlagActive === true,
-                windsockActive: nextLiveFlag.windsockActive === true,
-                pending: true,
-                preparedAt: time,
-                preparedBy: {
-                  sauveteurId: context.sauveteurId,
-                  login: session.login,
-                  role: context.userRole,
-                },
-              };
-
-              // Le drapeau principal est AFFALÉ par défaut, y compris
-              // le premier jour, sans diffuser la couleur préparée.
-              const publicDefault = !previousLiveFlag.flagPosition ?
-                {liveFlag: {
-                  flagColor: "green",
-                  flagPosition: "affale",
-                  purpleFlagActive: false,
-                  windsockActive: false,
-                }} : {};
-
-              transaction.set(spotReference, {
-                ...publicDefault,
-                preparedFlag,
-                updatedAt: time,
-              }, {merge: true});
-              transaction.set(auditReference, {
-                territoireId: context.territoireId,
-                spotId,
-                sauveteurId: context.sauveteurId,
-                login: session.login,
-                role: context.userRole,
-                changes: {preparedFlag},
-                source: "flag_preparation",
-                createdAt: time,
-              });
-              if (flagTransition.journalLines.length > 0) {
-                const reference = territoireSpotReference
-                    .collection("mainCourante").doc();
-                transaction.set(reference, {
-                  type: "Drapeau",
-                  description: "Préparation hors horaires, non diffusée : " +
-                    flagTransition.journalLines.join(" • "),
-                  actionTaken: "Préparation des signaux SPHOT",
-                  visibility: "operational",
-                  occurredAt: time,
-                  createdAt: time,
-                  createdBy: preparedFlag.preparedBy,
-                  source: "flag_preparation",
-                  immutableOriginal: true,
-                });
-              }
-              return {flagWasLowered: false, operationalAlertMessage: ""};
+            if (!schedule.open &&
+                (flagTransition.requiresOpenSurveillance ||
+                 flagTransition.colorChanged)) {
+              const denied = new Error(schedule.configured ?
+                "surveillance_closed" : "surveillance_schedule_missing");
+              denied.httpStatus = 409;
+              denied.serverTimeUtc = now.toISOString();
+              denied.periods = schedule.matchedPeriods.map((period) => ({
+                startHour: period.startHour,
+                endHour: period.endHour,
+                timeZone: period.timeZone || "Europe/Paris",
+              }));
+              throw denied;
             }
 
-            // Une manœuvre pendant la plage ouverte consomme la préparation.
+            // Le statut découle de l'horaire et de la position contrôlés
+            // par le serveur, jamais du libellé envoyé par le téléphone.
+            const requestedPosition = (nextLiveFlag.flagPosition || "")
+                .toString().trim().toLowerCase();
+            const requestedColor = (nextLiveFlag.flagColor || "")
+                .toString().trim().toLowerCase();
+            const raisedStatus =
+              requestedColor === "red" || requestedColor === "rouge" ?
+                "Baignade interdite" :
+                requestedColor === "yellow" || requestedColor === "jaune" ?
+                  "Baignade surveillée mais dangereuse" :
+                  "Baignade surveillée et autorisée";
+            sanitizedChanges.statutBaignade = !schedule.open ?
+              "Baignade non surveillée" :
+              requestedPosition === "affale" ||
+              requestedPosition === "affalé" ?
+                "Baignade non surveillée temporairement" : raisedStatus;
+
+            // Une ancienne préparation, si présente, est effacée
+            // uniquement lors d'une nouvelle manœuvre autorisée.
             if (previousPreparedFlag) {
               sanitizedChanges.preparedFlag =
                 admin.firestore.FieldValue.delete();
@@ -7675,6 +7664,7 @@ exports.updateSauveteurLiveState = onRequest(
 
           transaction.set(spotReference, {
             ...sanitizedChanges,
+            territoireId: context.territoireId,
             ...(operationalAlertUpdate ?
               {operationalAlert: operationalAlertUpdate} : {}),
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -7711,8 +7701,9 @@ exports.updateSauveteurLiveState = onRequest(
 
             transaction.set(mainCouranteReference, {
               type: "Drapeau",
-              description: flagJournalLines.join(" • "),
-              actionTaken: "Enregistrement automatique SPHOT SAUVETEUR",
+              description: describeFlagManeuver(
+                  previousEffectiveFlag, nextLiveFlag),
+              actionTaken: "",
               visibility: "operational",
               occurredAt: admin.firestore.FieldValue.serverTimestamp(),
               createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -7777,6 +7768,7 @@ exports.updateSauveteurLiveState = onRequest(
         if (error.httpStatus &&
             (error.message === "invalid_flag_state" ||
              error.message === "flag_color_requires_lowered" ||
+             error.message === "supplementary_requires_lowered" ||
              error.message === "surveillance_closed" ||
              error.message === "surveillance_schedule_missing")) {
           response.status(error.httpStatus).json({

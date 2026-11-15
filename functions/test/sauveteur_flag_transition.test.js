@@ -30,7 +30,7 @@ test("affalage seul autorisé et journalisé individuellement", () => {
   assert.equal(transition.flagWasLowered, true);
   assert.equal(transition.flagWasRaised, false);
   assert.deepEqual(transition.journalLines, [
-    "Position du drapeau : Hissé → Affalé",
+    "Drapeau VERT affalé.",
   ]);
 });
 
@@ -41,7 +41,7 @@ test("couleur change uniquement affalé avant et après", () => {
   );
   assert.equal(transition.error, undefined);
   assert.deepEqual(transition.journalLines, [
-    "Couleur du drapeau : Vert → Jaune",
+    "Drapeau affalé : VERT → JAUNE.",
   ]);
 });
 
@@ -60,20 +60,16 @@ test("hissage sans changement de couleur autorisé et journalisé", () => {
   );
   assert.equal(transition.flagWasRaised, true);
   assert.deepEqual(transition.journalLines, [
-    "Position du drapeau : Affalé → Hissé",
+    "Drapeau JAUNE hissé.",
   ]);
 });
 
-test("signaux additionnels n'altèrent pas la couleur enregistrée", () => {
-  const transition = evaluateFlagTransition(
-      {flagColor: "red", flagPosition: "hisse"},
-      {flagColor: "red", flagPosition: "hisse", purpleFlagActive: true},
-  );
-  assert.equal(transition.error, undefined);
-  assert.deepEqual(transition.journalLines, [
-    "Drapeau violet : Activé",
-  ]);
-  assert.equal(transition.requiresOpenSurveillance, true);
+test("signaux complémentaires : hissage interdit si principal hissé", () => {
+  for (const key of ["purpleFlagActive", "windsockActive"]) {
+    const next = {flagColor: "green", flagPosition: "hisse", [key]: true};
+    const result = evaluateFlagTransition(oldFlag, next);
+    assert.equal(result.error, "supplementary_requires_lowered");
+  }
 });
 
 test("première initialisation exige le drapeau affalé", () => {
@@ -123,7 +119,7 @@ test("transaction atomique, auteur et droits restent présents", () => {
   assert.match(handler, /flag_color_requires_lowered/);
 });
 
-test("hors horaires : changement de couleur toujours possible affalé", () => {
+test("couleur modifiable drapeau affalé ; horaires au serveur", () => {
   const colors = ["green", "yellow", "red"];
   for (const from of colors) {
     for (const to of colors) {
@@ -135,7 +131,7 @@ test("hors horaires : changement de couleur toujours possible affalé", () => {
       assert.equal(transition.error, undefined);
       assert.equal(transition.requiresOpenSurveillance, false);
       assert.equal(transition.journalLines.length, 1);
-      assert.match(transition.journalLines[0], /Couleur du drapeau :/);
+      assert.match(transition.journalLines[0], /Drapeau affalé :/);
       assert.equal(transition.flagWasRaised, false);
     }
   }
@@ -150,8 +146,9 @@ test("hors horaires : affalage autorisé et écrit dans la main courante", () =>
     assert.equal(transition.error, undefined);
     assert.equal(transition.requiresOpenSurveillance, false);
     assert.equal(transition.flagWasLowered, true);
+    const names = {green: "VERT", yellow: "JAUNE", red: "ROUGE"};
     assert.deepEqual(transition.journalLines, [
-      "Position du drapeau : Hissé → Affalé",
+      `Drapeau ${names[color]} affalé.`,
     ]);
   }
 });
@@ -186,8 +183,8 @@ test("hors horaires : désactivations et initialisation", () => {
   });
   assert.equal(disabled.requiresOpenSurveillance, false);
   assert.deepEqual(disabled.journalLines, [
-    "Drapeau violet : Désactivé",
-    "Manche à air : Désactivée",
+    "Drapeau VIOLET affalé.",
+    "Manche à air affalée.",
   ]);
   const initialized = evaluateFlagTransition({}, {
     flagColor: "yellow", flagPosition: "affale",
@@ -210,8 +207,8 @@ test("activation et changement de couleur combinés exigent horaires ouverts",
       assert.equal(result.error, undefined);
       assert.equal(result.requiresOpenSurveillance, true);
       assert.deepEqual(result.journalLines, [
-        "Couleur du drapeau : Vert → Jaune",
-        "Drapeau violet : Activé",
+        "Drapeau affalé : VERT → JAUNE.",
+        "Drapeau VIOLET hissé.",
       ]);
     });
 
@@ -226,8 +223,8 @@ test("désactivation violette et manche à air autorisée hors horaires", () => 
   const transition = evaluateFlagTransition(prior, after);
   assert.equal(transition.requiresOpenSurveillance, false);
   assert.deepEqual(transition.journalLines, [
-    "Drapeau violet : Désactivé",
-    "Manche à air : Désactivée",
+    "Drapeau VIOLET affalé.",
+    "Manche à air affalée.",
   ]);
 });
 
@@ -254,9 +251,9 @@ test("le serveur vérifie les horaires pour toute manœuvre active", () => {
       .split("exports.")[0];
   assert.match(handler, /if \(flagTransition\)/);
   assert.match(handler, /surveillanceWindowForSauveteurs\(/);
-  assert.match(handler, /if \(!schedule\.open\)/);
-  assert.match(handler, /preparedFlag/);
-  assert.match(handler, /"flag_preparation"/);
+  assert.match(handler, /if \(!schedule\.open/);
+  assert.doesNotMatch(handler, /source: "flag_preparation"/);
+  assert.match(handler, /flagTransition\.colorChanged/);
 });
 
 test("preparation consommee : audit sans sentinelle Firestore", () => {
@@ -287,4 +284,21 @@ test("preparation consommee : audit sans sentinelle Firestore", () => {
   assert.equal(withoutPrep.preparedFlagConsumed, undefined);
   assert.match(handler, /changes: auditChanges,/);
   assert.doesNotMatch(handler, /changes: sanitizedChanges,/);
+});
+
+test("les signaux complémentaires peuvent être hissés principal affalé", () => {
+  const previous = {flagColor: "green", flagPosition: "affale",
+    purpleFlagActive: false, windsockActive: false};
+  for (const key of ["purpleFlagActive", "windsockActive"]) {
+    const result = evaluateFlagTransition(previous, {...previous, [key]: true});
+    assert.equal(result.error, undefined);
+    assert.equal(result.requiresOpenSurveillance, true);
+  }
+});
+
+test("aucun événement si le drapeau est déjà affalé", () => {
+  const flag = {flagColor: "green", flagPosition: "affale",
+    purpleFlagActive: false, windsockActive: false};
+  const result = evaluateFlagTransition(flag, {...flag});
+  assert.deepEqual(result.journalLines, []);
 });

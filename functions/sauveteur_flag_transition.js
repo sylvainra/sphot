@@ -60,10 +60,14 @@ function evaluateFlagTransition(previous, next) {
     next.purpleFlagActive : oldPurple;
   const newWindsock = typeof next.windsockActive === "boolean" ?
     next.windsockActive : oldWindsock;
-  // Hors horaires, la couleur peut être préparée avec le drapeau affalé.
-  // L'affalage principal et la désactivation des signaux complémentaires
-  // restent possibles en permanence. Seuls les hissages/activations sont
-  // soumis aux horaires de surveillance définis par l'Admin.
+  // Un signal complémentaire ne peut changer (activer ou retirer)
+  // que si le drapeau principal était et reste affalé.
+  if ((oldPurple !== newPurple || oldWindsock !== newWindsock) &&
+      (oldPosition !== "Affalé" || newPosition !== "Affalé")) {
+    return {error: "supplementary_requires_lowered"};
+  }
+  // L'horaire de surveillance est vérifié par le serveur avant écriture.
+  // Aucun changement de couleur ne sera préparé hors horaires.
   const requiresOpenSurveillance =
     (oldPosition !== "Hissé" && newPosition === "Hissé") ||
     (!oldPurple && newPurple) ||
@@ -72,25 +76,21 @@ function evaluateFlagTransition(previous, next) {
   const journalLines = [];
   if (colorChanged) {
     journalLines.push(
-        `Couleur du drapeau : ${oldColor || "Non renseigné"} → ${newColor}`,
+        `Drapeau affalé : ${oldColor ? oldColor.toUpperCase() : "AUCUN"}` +
+        ` → ${newColor.toUpperCase()}.`,
     );
   }
   if (oldPosition !== newPosition) {
-    journalLines.push(
-        `Position du drapeau : ${oldPosition || "Non renseignée"}` +
-        ` → ${newPosition}`,
-    );
+    journalLines.push(`Drapeau ${newColor.toUpperCase()} ` +
+        `${newPosition === "Hissé" ? "hissé" : "affalé"}.`);
   }
-
   if (oldPurple !== newPurple) {
-    journalLines.push(
-        `Drapeau violet : ${newPurple ? "Activé" : "Désactivé"}`,
-    );
+    journalLines.push(`Drapeau VIOLET ` +
+        `${newPurple ? "hissé" : "affalé"}.`);
   }
   if (oldWindsock !== newWindsock) {
-    journalLines.push(
-        `Manche à air : ${newWindsock ? "Activée" : "Désactivée"}`,
-    );
+    journalLines.push(`Manche à air ` +
+        `${newWindsock ? "hissée" : "affalée"}.`);
   }
 
   const flagWasLowered = oldPosition !== "Affalé" &&
@@ -100,6 +100,7 @@ function evaluateFlagTransition(previous, next) {
 
   return {
     journalLines,
+    colorChanged,
     requiresOpenSurveillance,
     flagWasLowered,
     flagWasRaised,
@@ -107,4 +108,113 @@ function evaluateFlagTransition(previous, next) {
   };
 }
 
-module.exports = {evaluateFlagTransition};
+/**
+ * État visible du mât en deux groupes, sans historique ni signaux absents.
+ * La fermeture programmée classe tous les signaux présents comme affalés.
+ * @param {Object} state État du mât avant ou après la manœuvre.
+ * @param {boolean} closure True pour la fermeture automatique.
+ * @return {string} Groupes HISSÉS / AFFALÉS des signaux présents.
+ */
+function describeFlagMast(state, closure = false) {
+  const flag = state || {};
+  const color = flagColor(flag.flagColor);
+  const position = flagPosition(flag.flagPosition);
+  const raised = [];
+  const lowered = [];
+
+  if (color) {
+    if (closure || position === "Affalé") {
+      lowered.push(color.toUpperCase());
+    } else if (position === "Hissé") {
+      raised.push(color.toUpperCase());
+    }
+  }
+  if (flag.purpleFlagActive === true) {
+    (closure ? lowered : raised).push("VIOLET");
+  }
+  if (flag.windsockActive === true) {
+    (closure ? lowered : raised).push("MANCHE À AIR");
+  }
+
+  const parts = [];
+  if (raised.length) parts.push(`HISSÉS : ${raised.join(", ")}`);
+  if (lowered.length) parts.push(`AFFALÉS : ${lowered.join(", ")}`);
+  return parts.join(" • ");
+}
+
+
+/**
+ * Une inscription synthétique par manœuvre : HISSÉ(S), AFFALÉ(S),
+ * CHANGEMENT, AJOUT, RETRAIT. Le drapeau principal entraînant les autres
+ * signaux au pied du mât, son affalage les récapitule ensemble.
+ * Les retraits de signaux sont distincts des affalages.
+ * @param {Object} previous État confirmé avant la manœuvre.
+ * @param {Object} next État confirmé après la manœuvre.
+ * @return {string} Description pour la main courante.
+ */
+function describeFlagManeuver(previous, next) {
+  const before = previous || {};
+  const after = next || {};
+  const oldColor = flagColor(before.flagColor);
+  const newColor = flagColor(after.flagColor);
+  const oldPosition = flagPosition(before.flagPosition);
+  const newPosition = flagPosition(after.flagPosition);
+  const oldPurple = before.purpleFlagActive === true;
+  const newPurple = after.purpleFlagActive === true;
+  const oldWindsock = before.windsockActive === true;
+  const newWindsock = after.windsockActive === true;
+
+  const mainRaised = oldPosition !== "Hissé" &&
+      newPosition === "Hissé";
+  const mainLowered = oldPosition !== "Affalé" &&
+      newPosition === "Affalé";
+  const added = [];
+  if (!oldPurple && newPurple) added.push("VIOLET");
+  if (!oldWindsock && newWindsock) added.push("MANCHE À AIR");
+  const raised = [];
+  const lowered = [];
+  const removed = [];
+
+  // Hissage du drapeau principal : recenser les signaux qui montent
+  // ensemble. L'activation seule d'un complémentaire est un AJOUT.
+  if (mainRaised) {
+    if (newPosition === "Hissé" && newColor) {
+      raised.push(newColor.toUpperCase());
+    }
+    if (newPurple) raised.push("VIOLET");
+    if (newWindsock) raised.push("MANCHE À AIR");
+  }
+
+  // Affaler le principal abaisse physiquement tout le groupe présent.
+  // Le violet et la manche à air actifs descendent en même temps.
+  if (mainLowered && newColor) {
+    lowered.push(newColor.toUpperCase());
+    if (newPurple) lowered.push("VIOLET");
+    if (newWindsock) lowered.push("MANCHE À AIR");
+  }
+
+  // Retrait : un complémentaire enlevé du mât, pas une descente.
+  if (oldPurple && !newPurple) removed.push("VIOLET");
+  if (oldWindsock && !newWindsock) removed.push("MANCHE À AIR");
+
+  const lines = [];
+  if (raised.length) {
+    lines.push(`${raised.length > 1 ? "HISSÉS" : "HISSÉ"} : ` +
+        raised.join(", "));
+  }
+  if (lowered.length) {
+    lines.push(`${lowered.length > 1 ? "AFFALÉS" : "AFFALÉ"} : ` +
+        lowered.join(", "));
+  }
+  if (oldColor && newColor && oldColor !== newColor) {
+    lines.push(`CHANGEMENT : ${oldColor.toUpperCase()}` +
+        ` → ${newColor.toUpperCase()}`);
+  }
+  if (added.length) lines.push(`AJOUT : ${added.join(", ")}`);
+  if (removed.length) lines.push(`RETRAIT : ${removed.join(", ")}`);
+  return lines.join(" • ");
+}
+
+module.exports = {
+  evaluateFlagTransition, describeFlagMast, describeFlagManeuver,
+};
