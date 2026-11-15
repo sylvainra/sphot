@@ -192,7 +192,8 @@ async function autoLowerClosedFlags(firestore, admin, now = new Date()) {
                 freshPeriods.docs.map((doc) => ({...doc.data(), id: doc.id})),
                 now,
             ).writable;
-            if (journalOpen) transaction.set(journalRef, {
+            if (journalOpen) {
+              transaction.set(journalRef, {
               type: "Drapeau",
               description: mastAtClosure,
               actionTaken: "",
@@ -206,7 +207,8 @@ async function autoLowerClosedFlags(firestore, admin, now = new Date()) {
               },
               source: "automatic_surveillance_closure",
               immutableOriginal: true,
-            });
+              });
+            }
 
             transaction.set(auditRef, {
               territoireId: territoryId,
