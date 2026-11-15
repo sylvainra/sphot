@@ -1,0 +1,90 @@
+name: SPHOT - Livraison cible MAIN COURANTE 15 novembre 2026
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/deploy-main-courante-once-20261115.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sphot-production-main-courante
+  cancel-in-progress: false
+
+jobs:
+  deploy-main-courante:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    steps:
+      - name: Recuperer exactement le commit validé
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verifier le commit et le perimetre strict du deploiement
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="51445497d9704f4aa7a29aa760b49a08d1a1ab4d"
+          FILE=".github/workflows/deploy-main-courante-once-20261115.yml"
+          test "$(git rev-parse HEAD^)" = "$BASE"
+          test "$(git diff --name-only "$BASE" HEAD)" = "$FILE"
+          node -e "const f=require('./firebase.json');const a=f.functions||[];if (!a.some(x=>x.codebase==='default' && x.source==='functions')|| !a.some(x=>x.codebase==='legal'&&x.source==='functions-legal'))process.exit(1)"
+          echo "Perimetre verifie : codebase default uniquement, 10 fonctions nommees."
+
+      - name: Preparer Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Installer les dependances de fonctions
+        run: npm --prefix functions ci
+
+      - name: Reexecuter la verification ESLint et les tests de non-regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm --prefix functions run lint
+          node --check functions/index.js
+          node --check functions/sauveteur_main_courante_lifecycle.js
+          node --test functions/test/sauveteur_main_courante_lifecycle.test.js functions/test/sauveteur_flag_auto_lower.test.js functions/test/sauveteur_flag_transition.test.js functions/test/sauveteur_material_verification.test.js
+
+      - name: Verifier l'identite Firebase sans afficher de secret
+        env:
+          FIREBASE_SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SPHOT_AB80B }}
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${FIREBASE_SA_JSON:-}" ]; then
+            AUTHFILE="$RUNNER_TEMP/sphot-firebase-service-account.json"
+            printf '%s' "$FIREBASE_SA_JSON" > "$AUTHFILE"
+            chmod 600 "$AUTHFILE"
+            echo "GOOGLE_APPLICATION_CREDENTIALS=$AUTHFILE" >> "$GITHUB_ENV"
+            echo "Compte de service Firebase disponible."
+          elif [ -n "${FIREBASE_TOKEN:-}" ]; then
+            echo "FIREBASE_TOKEN=$FIREBASE_TOKEN" >> "$GITHUB_ENV"
+            echo "::warning::Jeton Firebase ancien format utilise."
+          else
+            echo "::error::Pas de secret Firebase configure. Aucun deploiement effectue."
+            exit 2
+          fi
+
+      - name: Installer Firebase CLI
+        run: npm install --global firebase-tools
+
+      - name: Deployer UNIQUEMENT les dix fonctions MAIN COURANTE
+        shell: bash
+        run: |
+          set -euo pipefail
+          firebase deploy --project sphot-ab80b --only "functions:default:getSauveteurMainCourante,functions:default:getSauveteurStats,functions:default:getInstitutionalMainCourante,functions:default:recordSauveteurMaterialVerification,functions:default:addSauveteurMainCouranteEntry,functions:default:updateSauveteurMainCouranteEntry,functions:default:deleteSauveteurMainCouranteEntry,functions:default:updateSauveteurLiveState,functions:default:autoLowerSauveteurFlags,functions:default:purgeExpiredSauveteurMainCourante" --non-interactive
+
+      - name: Enregistrer le perimetre de la livraison
+        run: |
+          echo "Deploiement : MAIN COURANTE dans Cloud Functions default seulement."
+          echo "Aucun Hosting, Flutter mobile, document legal, Firestore Rules ou autre codebase deploye."
+          echo "Aucune execution manuelle de la purge annuelle."
