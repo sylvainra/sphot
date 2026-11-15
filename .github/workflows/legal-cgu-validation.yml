@@ -76,8 +76,9 @@ jobs:
           node --check functions/sauveteur_flag_transition.js
           node --check functions/sauveteur_surveillance_schedule.js
           node --check functions/sauveteur_flag_auto_lower.js
+          node --check functions/sauveteur_main_courante_lifecycle.js
       - name: Tests de versions des acceptations
-        run: node --test functions/test/legal_document_versions.test.js functions/test/sauveteur_legal_propagation.test.js functions/test/sauveteur_material_verification.test.js functions/test/sauveteur_flag_transition.test.js functions/test/sauveteur_surveillance_schedule.test.js functions/test/sauveteur_flag_auto_lower.test.js
+        run: node --test functions/test/legal_document_versions.test.js functions/test/sauveteur_legal_propagation.test.js functions/test/sauveteur_material_verification.test.js functions/test/sauveteur_flag_transition.test.js functions/test/sauveteur_surveillance_schedule.test.js functions/test/sauveteur_flag_auto_lower.test.js functions/test/sauveteur_main_courante_lifecycle.test.js
       - name: Vérifier les deux codebases Firebase
         run: node -e "const f=require('./firebase.json'); if(!f.functions.some(x=>x.codebase==='legal'&&x.source==='functions-legal'))process.exit(1)"
       - name: Installer éditeur juridique
