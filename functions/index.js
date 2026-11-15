@@ -7916,6 +7916,7 @@ exports.getSauveteurMainCourante = onRequest(
           entries,
           canWrite: context.canManageRestrictedOperationalData &&
             context.sphotMode === "ON" && journalState.writable,
+          canMutate: context.sphotMode === "ON" && journalState.writable,
           closed: journalState.closed,
         });
       } catch (error) {
