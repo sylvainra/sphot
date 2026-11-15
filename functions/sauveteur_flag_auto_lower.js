@@ -4,6 +4,8 @@ const {surveillanceWindowForSauveteurs} =
   require("./sauveteur_surveillance_schedule");
 
 const {describeFlagMast} = require("./sauveteur_flag_transition");
+const {mainCouranteLifecycle} =
+    require("./sauveteur_main_courante_lifecycle");
 
 const HISSE_VALUES = ["hisse", "hissé", "Hissé", "Hisse"];
 
@@ -182,7 +184,15 @@ async function autoLowerClosedFlags(firestore, admin, now = new Date()) {
               updatedAt: nowServer,
             }, {merge: true});
 
-            transaction.set(journalRef, {
+            // Après la dernière journée de saison, aucune nouvelle
+            // inscription (même automatique) n'entre dans la main courante.
+            const journalOpen = mainCouranteLifecycle(
+                freshSpot.data() || {},
+                freshAssigned.docs.map((doc) => doc.data() || {}),
+                freshPeriods.docs.map((doc) => ({...doc.data(), id: doc.id})),
+                now,
+            ).writable;
+            if (journalOpen) transaction.set(journalRef, {
               type: "Drapeau",
               description: mastAtClosure,
               actionTaken: "",
