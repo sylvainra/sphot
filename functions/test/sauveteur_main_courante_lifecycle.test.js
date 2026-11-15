@@ -135,7 +135,8 @@ test("routes de lecture: consultation OFF, écriture bloquée et année bornée"
         assert.match(handler, /loadMainCouranteLifecycle/);
         assert.match(handler, /main_courante_closed/);
       }
-      assert.match(autoLower, /if \(journalOpen\) transaction\.set/);
+      assert.match(autoLower,
+          /if \(journalOpen\) \{[\s\S]*?transaction\.set\(journalRef/);
       assert.match(source, /exports\.purgeExpiredSauveteurMainCourante/);
     });
 
