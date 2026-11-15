@@ -139,6 +139,12 @@ test("routes de lecture: consultation OFF, écriture bloquée et année bornée"
       assert.match(source, /exports\.purgeExpiredSauveteurMainCourante/);
     });
 
+/**
+ * Mock Firestore collection for timestamp-based purge tests.
+ * @param {Array<Object>} initial Seed documents.
+ * @param {string} name Collection name.
+ * @return {Object} Mock reference and mutable rows.
+ */
 function fakeCollection(initial, name = "collection") {
   const rows = initial.map((data, i) => ({
     data: () => data,
@@ -204,7 +210,9 @@ test("la purge retire récits, corrections et vues expirées, jamais 2027",
         batch() {
           const pending = [];
           return {
-            delete(ref) { pending.push(ref); },
+            delete(ref) {
+              pending.push(ref);
+            },
             async commit() {
               for (const ref of pending) ref.removed = true;
             },
