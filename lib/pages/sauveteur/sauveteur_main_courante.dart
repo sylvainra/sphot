@@ -79,6 +79,7 @@ class _SauveteurMainCourantePageState
   bool _saving = false;
   bool _entryMutationInProgress = false;
   bool _sharingMainCourante = false;
+  bool _serverAllowsMainCouranteMutations = false;
   String? _statusMessage;
 
   // Référence visuelle : le label flottant du menu "Type de fait".
@@ -147,12 +148,14 @@ class _SauveteurMainCourantePageState
 
   bool get _isSupervisor => widget.canManageRestrictedOperationalData;
 
-  bool get _canWrite => _isSphotOn && _isSupervisor;
+  bool get _canWrite =>
+      _isSphotOn && _isSupervisor && _serverAllowsMainCouranteMutations;
 
   // Les événements Drapeau sont supprimables par un sauveteur affecté ;
   // l'original reste conservé dans l'audit côté serveur.
   bool _canDeleteFlagEntry(Map<String, dynamic> entry) =>
       _isSphotOn &&
+      _serverAllowsMainCouranteMutations &&
       (entry['type'] ?? '').toString().trim().toLowerCase() == 'drapeau';
 
   DateTime get _today {
@@ -1338,6 +1341,7 @@ class _SauveteurMainCourantePageState
     setState(() {
       _loading = true;
       _statusMessage = null;
+      _serverAllowsMainCouranteMutations = false;
     });
 
     try {
@@ -1394,6 +1398,7 @@ class _SauveteurMainCourantePageState
             '${response.statusCode}$diagnostic');
         setState(() {
           _entries = [];
+          _serverAllowsMainCouranteMutations = false;
           _statusMessage = '$explanation '
               '(HTTP ${response.statusCode}$diagnostic)';
         });
@@ -1431,6 +1436,8 @@ class _SauveteurMainCourantePageState
 
       setState(() {
         _entries = entriesForSelectedDay;
+        _serverAllowsMainCouranteMutations =
+            decoded is Map<String, dynamic> && decoded['canMutate'] == true;
       });
 
       await _loadPresenceContext(entriesForSelectedDay);
