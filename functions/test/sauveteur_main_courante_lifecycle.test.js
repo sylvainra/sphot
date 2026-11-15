@@ -24,7 +24,7 @@ const period = (id, start, end) => ({
 
 const assigned = [{periodesSurveillance: ["2026"]}];
 const periods = [
-  period("2026", "2026-06-01T22:00:00Z", "2026-08-31T22:00:00Z"),
+  period("2026", "2026-05-31T22:00:00Z", "2026-08-30T22:00:00Z"),
 ];
 
 test("dernière journée de surveillance entièrement modifiable, lendemain fermé",
