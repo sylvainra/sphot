@@ -194,19 +194,19 @@ async function autoLowerClosedFlags(firestore, admin, now = new Date()) {
             ).writable;
             if (journalOpen) {
               transaction.set(journalRef, {
-              type: "Drapeau",
-              description: mastAtClosure,
-              actionTaken: "",
-              visibility: "operational",
-              occurredAt: nowServer,
-              createdAt: nowServer,
-              createdBy: {
-                role: "SYSTÈME",
-                displayName: "SPHOT (automatique)",
-                automaticMainFlagLoweredByAdminSchedule: raised,
-              },
-              source: "automatic_surveillance_closure",
-              immutableOriginal: true,
+                type: "Drapeau",
+                description: mastAtClosure,
+                actionTaken: "",
+                visibility: "operational",
+                occurredAt: nowServer,
+                createdAt: nowServer,
+                createdBy: {
+                  role: "SYSTÈME",
+                  displayName: "SPHOT (automatique)",
+                  automaticMainFlagLoweredByAdminSchedule: raised,
+                },
+                source: "automatic_surveillance_closure",
+                immutableOriginal: true,
               });
             }
 
