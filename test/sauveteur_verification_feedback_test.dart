@@ -49,7 +49,9 @@ void main() {
     expect(end, greaterThan(begin));
     final route = functions.substring(begin, end);
     expect(route.contains('resolveSauveteurSession'), isTrue);
-    expect(route.contains('context.realtimeSpotIds.includes(spotId)'), isTrue);
+    expect(route.contains('context.assignedSpotIds.includes(spotId)'), isTrue);
+    expect(route.contains('mainCouranteReadBounds'), isTrue);
+    expect(route.contains('context.sphotMode !== "ON"'), isFalse);
     expect(route.contains('entry.visibility !== "restricted"'), isTrue);
     expect(route.contains('|| canSeeRestricted'), isTrue);
     expect(route.contains('mainCouranteAccessLogs'), isTrue);

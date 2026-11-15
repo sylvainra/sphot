@@ -4,6 +4,11 @@ const {evaluateFlagTransition, describeFlagManeuver} =
 const {surveillanceWindowForSauveteurs} =
   require("./sauveteur_surveillance_schedule");
 const {autoLowerClosedFlags} = require("./sauveteur_flag_auto_lower");
+const {
+  mainCouranteReadBounds,
+  loadMainCouranteLifecycle,
+  purgeExpiredMainCourante,
+} = require("./sauveteur_main_courante_lifecycle");
 const {attachOperationalSpotTerritory} =
     require("./sauveteur_spot_territory");
 const {shouldRejectSauveteurBrowserLogin} =
@@ -7096,33 +7101,23 @@ exports.getInstitutionalMainCourante = onRequest(
           }
 
           if (!statusOnly) {
-            let entriesQuery = territoryReference
-                .collection("spots")
-                .doc(spotId)
-                .collection("mainCourante");
-
-            const dayStartMillis = Number(request.body.dayStartMillis);
-            const dayEndMillis = Number(request.body.dayEndMillis);
-            if (Number.isFinite(dayStartMillis) &&
-                Number.isFinite(dayEndMillis) &&
-                dayEndMillis > dayStartMillis) {
-              entriesQuery = entriesQuery
+            const bounds = mainCouranteReadBounds(request.body);
+            const entriesSnapshot = bounds.empty ?
+              {docs: []} : await territoryReference
+                  .collection("spots")
+                  .doc(spotId)
+                  .collection("mainCourante")
                   .where(
-                      "occurredAt",
-                      ">=",
-                      admin.firestore.Timestamp.fromMillis(dayStartMillis),
+                      "occurredAt", ">=",
+                      admin.firestore.Timestamp.fromMillis(bounds.from),
                   )
                   .where(
-                      "occurredAt",
-                      "<",
-                      admin.firestore.Timestamp.fromMillis(dayEndMillis),
-                  );
-            }
-
-            const entriesSnapshot = await entriesQuery
-                .orderBy("occurredAt", "desc")
-                .limit(500)
-                .get();
+                      "occurredAt", "<",
+                      admin.firestore.Timestamp.fromMillis(bounds.until),
+                  )
+                  .orderBy("occurredAt", "desc")
+                  .limit(500)
+                  .get();
 
             entries = entriesSnapshot.docs
                 .map((document) => {
@@ -7366,6 +7361,25 @@ exports.autoLowerSauveteurFlags = onSchedule(
     },
 );
 
+// Purge à minuit le 1er janvier (heure de Paris), avec reprise mensuelle
+// si un incident a interrompu la suppression d'une année écoulée.
+exports.purgeExpiredSauveteurMainCourante = onSchedule(
+    {
+      schedule: "0 0 1 * *",
+      timeZone: "Europe/Paris",
+      region: "us-central1",
+      cpu: 1,
+      memory: "512MiB",
+      timeoutSeconds: 540,
+      maxInstances: 1,
+    },
+    async () => {
+      const counts = await purgeExpiredMainCourante(
+          admin.firestore(), admin);
+      console.log("Purge annuelle MAIN COURANTE SPHOT:", counts);
+    },
+);
+
 exports.updateSauveteurLiveState = onRequest(
     {
       secrets: ["GMAIL_APP_PASSWORD"],
@@ -7499,6 +7513,10 @@ exports.updateSauveteurLiveState = onRequest(
           return;
         }
 
+        // Un signal live ne doit plus créer d'inscription dans une
+        // main courante clôturée, même si sa manœuvre reste autorisée.
+        const journalLifecycle = await loadMainCouranteLifecycle(
+            admin.firestore(), context.territoireId, spotId);
         const db = admin.firestore();
         const spotReference = db.collection("spots").doc(spotId);
         const outcome = await db.runTransaction(async (transaction) => {
@@ -7690,7 +7708,7 @@ exports.updateSauveteurLiveState = onRequest(
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
           });
 
-          if (flagJournalLines.length > 0) {
+          if (flagJournalLines.length > 0 && journalLifecycle.writable) {
             const mainCouranteReference = db
                 .collection("territoires")
                 .doc(context.territoireId)
@@ -7717,7 +7735,7 @@ exports.updateSauveteurLiveState = onRequest(
             });
           }
 
-          if (automaticNotificationMainCourante) {
+          if (automaticNotificationMainCourante && journalLifecycle.writable) {
             const mainCouranteReference = db
                 .collection("territoires")
                 .doc(context.territoireId)
@@ -7825,8 +7843,10 @@ exports.getSauveteurMainCourante = onRequest(
         const {context} = session;
         const spotId = (request.body.spotId || "").toString().trim();
 
-        if (context.sphotMode !== "ON" ||
-            !context.realtimeSpotIds.includes(spotId)) {
+        if (!context.assignedSpotIds.includes(spotId) ||
+            !(await supervisedSpotIds(
+                admin.firestore(), context.territoireId, [spotId]))
+                .includes(spotId)) {
           response.status(403).json({
             success: false,
             error: "main_courante_not_available",
@@ -7834,15 +7854,26 @@ exports.getSauveteurMainCourante = onRequest(
           return;
         }
 
-        const snapshot = await admin.firestore()
+        const bounds = mainCouranteReadBounds(request.body);
+        const snapshot = bounds.empty ? {docs: []} : await admin.firestore()
             .collection("territoires")
             .doc(context.territoireId)
             .collection("spots")
             .doc(spotId)
             .collection("mainCourante")
+            .where(
+                "occurredAt", ">=",
+                admin.firestore.Timestamp.fromMillis(bounds.from),
+            )
+            .where(
+                "occurredAt", "<",
+                admin.firestore.Timestamp.fromMillis(bounds.until),
+            )
             .orderBy("occurredAt", "desc")
             .limit(100)
             .get();
+        const journalState = await loadMainCouranteLifecycle(
+            admin.firestore(), context.territoireId, spotId);
 
         const canSeeRestricted =
           context.canManageRestrictedOperationalData;
@@ -7883,7 +7914,10 @@ exports.getSauveteurMainCourante = onRequest(
         response.status(200).json({
           success: true,
           entries,
-          canWrite: context.canManageRestrictedOperationalData,
+          canWrite: context.canManageRestrictedOperationalData &&
+            context.sphotMode === "ON" && journalState.writable,
+          canMutate: context.sphotMode === "ON" && journalState.writable,
+          closed: journalState.closed,
         });
       } catch (error) {
         console.error("Erreur lecture main courante:", error);
@@ -7991,6 +8025,16 @@ exports.recordSauveteurMaterialVerification = onRequest(
           return;
         }
 
+        const mainCouranteState = await loadMainCouranteLifecycle(
+            admin.firestore(), context.territoireId, spotId);
+        if (!mainCouranteState.writable) {
+          response.status(403).json({
+            success: false,
+            error: "main_courante_closed",
+          });
+          return;
+        }
+
         const verification = validateMaterialVerification(body);
         if (!verification) {
           response.status(400).json({
@@ -8087,6 +8131,16 @@ exports.addSauveteurMainCouranteEntry = onRequest(
           response.status(403).json({
             success: false,
             error: "insufficient_role",
+          });
+          return;
+        }
+
+        const mainCouranteState = await loadMainCouranteLifecycle(
+            admin.firestore(), context.territoireId, spotId);
+        if (!mainCouranteState.writable) {
+          response.status(403).json({
+            success: false,
+            error: "main_courante_closed",
           });
           return;
         }
@@ -11906,7 +11960,10 @@ exports.getSauveteurStats = onRequest(
         const {context} = session;
         const spotId = (request.body.spotId || "").toString().trim();
 
-        if (!context.realtimeSpotIds.includes(spotId)) {
+        if (!context.assignedSpotIds.includes(spotId) ||
+            !(await supervisedSpotIds(
+                admin.firestore(), context.territoireId, [spotId]))
+                .includes(spotId)) {
           response.status(403).json({
             success: false,
             error: "spot_not_assigned",
@@ -11914,32 +11971,22 @@ exports.getSauveteurStats = onRequest(
           return;
         }
 
-        let entriesQuery = admin.firestore()
+        const bounds = mainCouranteReadBounds(request.body);
+        const entriesQuery = admin.firestore()
             .collection("territoires")
             .doc(context.territoireId)
             .collection("spots")
             .doc(spotId)
-            .collection("mainCourante");
-
-        const dayStartMillis = Number(request.body.dayStartMillis);
-        const dayEndMillis = Number(request.body.dayEndMillis);
-        if (Number.isFinite(dayStartMillis) &&
-            Number.isFinite(dayEndMillis) &&
-            dayEndMillis > dayStartMillis) {
-          entriesQuery = entriesQuery
-              .where(
-                  "occurredAt",
-                  ">=",
-                  admin.firestore.Timestamp.fromMillis(dayStartMillis),
-              )
-              .where(
-                  "occurredAt",
-                  "<",
-                  admin.firestore.Timestamp.fromMillis(dayEndMillis),
-              );
-        }
-
-        const snapshot = await entriesQuery
+            .collection("mainCourante")
+            .where(
+                "occurredAt", ">=",
+                admin.firestore.Timestamp.fromMillis(bounds.from),
+            )
+            .where(
+                "occurredAt", "<",
+                admin.firestore.Timestamp.fromMillis(bounds.until),
+            );
+        const snapshot = bounds.empty ? {docs: []} : await entriesQuery
             .orderBy("occurredAt", "desc")
             .limit(500)
             .get();
@@ -12131,6 +12178,16 @@ exports.updateSauveteurMainCouranteEntry = onRequest(
           return;
         }
 
+        const mainCouranteState = await loadMainCouranteLifecycle(
+            admin.firestore(), context.territoireId, spotId);
+        if (!mainCouranteState.writable) {
+          response.status(403).json({
+            success: false,
+            error: "main_courante_closed",
+          });
+          return;
+        }
+
         const entryReference = admin.firestore()
             .collection("territoires")
             .doc(context.territoireId)
@@ -12289,6 +12346,16 @@ exports.deleteSauveteurMainCouranteEntry = onRequest(
           response.status(400).json({
             success: false,
             error: "entry_id_required",
+          });
+          return;
+        }
+
+        const mainCouranteState = await loadMainCouranteLifecycle(
+            admin.firestore(), context.territoireId, spotId);
+        if (!mainCouranteState.writable) {
+          response.status(403).json({
+            success: false,
+            error: "main_courante_closed",
           });
           return;
         }

@@ -235,7 +235,8 @@ test("journalisation serveur : changements atomiques", () => {
   const handler = source.split("exports.updateSauveteurLiveState =")[1]
       .split("exports.")[0];
   assert.match(handler, /flagTransition\.journalLines/);
-  assert.match(handler, /if \(flagJournalLines\.length > 0\)/);
+  assert.match(handler,
+      /if \(flagJournalLines\.length > 0 && journalLifecycle\.writable\)/);
   assert.match(handler, /type: "Drapeau"/);
   assert.match(handler, /source: "automatic_flag_event"/);
   assert.match(handler, /transaction\.set\(mainCouranteReference/);
