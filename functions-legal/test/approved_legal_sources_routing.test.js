@@ -109,7 +109,7 @@ test("CGU et charte : dates et manoeuvres conformes au cycle de vie serveur", ()
   assert.match(sauveteur, /SPHOT n’est que le vecteur technique/);
   assert.match(sauveteur, /Affalage préalable obligatoire/);
   for (const text of [admin, sauveteur, charterLog]) {
-    assert.match(text, /un sauveteur affecté et habilité au poste peut supprimer une inscription de type « Drapeau »/i);
+    assert.match(text, /(?:tout|un) sauveteur affecté et habilité au poste peut supprimer une inscription de type « Drapeau »/i);
     assert.match(text, /journal technique d’audit|trace d’audit technique/);
   }
   assert.match(sauveteur, /affale ou désactive automatiquement/);
