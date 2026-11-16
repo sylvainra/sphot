@@ -83,3 +83,43 @@ test("les cinq documents sont branchés au bon acteur", () => {
   }
   assert.match(login, /LegalPublishedVersion\.identifier/);
 });
+
+test("CGU et charte : dates et manoeuvres conformes au cycle de vie serveur", () => {
+  const sources = ["adminCgu", "sauveteurCgu", "sauveteurCharter"]
+      .map((id) => JSON.parse(fs.readFileSync(path.join(root,
+          "functions-legal/legal_sources", id + ".json"), "utf8")));
+  for (const document of sources) {
+    const fullText = document.chapters.map((c) => c.content).join("\n");
+    assert.equal(document.status, "PREPUBLICATION_NON_PUBLIE");
+    assert.equal(document.revisionPreparedOn, "2026-11-16");
+    assert.doesNotMatch(fullText,
+        /clôturée à 00 h 00 au début de la date de fermeture/);
+    assert.match(fullText, /dernier jour de surveillance/);
+    assert.match(fullText, /31 décembre/);
+    assert.match(fullText, /1er janvier à 00 h 00/);
+    assert.match(fullText, /lecture seule/);
+    assert.match(fullText, /signaux numériques/);
+  }
+
+  const admin = sources[0].chapters.find((c) => c.id === "07").content;
+  const sauveteur = sources[1].chapters.find((c) => c.id === "04").content;
+  const charterFlag = sources[2].chapters.find((c) => c.id === "03").content;
+  const charterLog = sources[2].chapters.find((c) => c.id === "05").content;
+  assert.match(admin, /SPHOT fournit le vecteur technique/);
+  assert.match(sauveteur, /SPHOT n’est que le vecteur technique/);
+  assert.match(sauveteur, /Affalage préalable obligatoire/);
+  assert.match(sauveteur, /affale ou désactive automatiquement/);
+  assert.match(charterFlag, /drapeau violet/);
+  assert.match(charterFlag, /manche à air/);
+  assert.match(charterFlag, /aucune manœuvre physique|n’actionne pas les drapeaux physiques/);
+  assert.match(charterLog, /31 août/);
+  assert.match(charterLog, /1er septembre à 00 h 00/);
+
+  const transition = fs.readFileSync(path.join(root,
+      "functions/sauveteur_flag_transition.js"), "utf8");
+  const auto = fs.readFileSync(path.join(root,
+      "functions/sauveteur_flag_auto_lower.js"), "utf8");
+  assert.match(transition, /supplementary_requires_lowered/);
+  assert.match(transition, /flag_color_requires_lowered/);
+  assert.match(auto, /function autoLowerClosedFlags/);
+});
