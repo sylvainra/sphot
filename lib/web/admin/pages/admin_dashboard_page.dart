@@ -15132,6 +15132,65 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
   }
 
+  // Le verrou juridique ne dépend pas des flux opérationnels Firestore.
+  // On réutilise le panneau d'étapes et les tuiles du vrai dashboard Admin :
+  // ils restent visibles même avant le chargement des données de SPHOTS.
+  // Aucun compte, SPHOT ou action métier n'est simulé ici.
+  Widget _buildLockedLegalDashboardBackdrop() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildRightPanel(visibleSpots: 0, canRequestTrial: false),
+        Expanded(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              FlutterMap(
+                key: ValueKey<String>(
+                  'admin-legal-map-'
+                  '${_territoryCenter.latitude}-'
+                  '${_territoryCenter.longitude}',
+                ),
+                options: MapOptions(
+                  initialCenter: _territoryCenter,
+                  initialZoom: _territoryZoom,
+                  minZoom: 2,
+                  maxZoom: 18,
+                ),
+                children: [
+                  TileLayer(
+                    key: ValueKey<String>(
+                      'admin-legal-tile-$_selectedTileStyle',
+                    ),
+                    urlTemplate: _tileStyles[_selectedTileStyle].url,
+                    subdomains: _tileStyles[_selectedTileStyle].subdomains,
+                    maxZoom:
+                        _tileStyles[_selectedTileStyle].maxZoom.toDouble(),
+                    maxNativeZoom: _tileStyles[_selectedTileStyle].maxZoom,
+                    userAgentPackageName: 'com.sylvainra.sphot',
+                  ),
+                ],
+              ),
+              Positioned(
+                top: 8,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Image.asset(
+                    'data/icons/title.png',
+                    height: 68,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.high,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   // Le contrôle réutilise les CGU ADMIN publiées dans Firestore.
   // Une nouvelle acceptation est demandée uniquement si la version a changé,
   // et jamais à chaque connexion lorsque la preuve courante existe.
@@ -15140,6 +15199,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Widget build(BuildContext context) => ProfessionalLegalGate(
     audience: ProfessionalLegalAudience.admin,
     child: _buildDashboardContent(context),
+    lockedBackground: _buildLockedLegalDashboardBackdrop(),
   );
 
   Widget _buildDashboardContent(BuildContext context) {
