@@ -39,6 +39,7 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
   final List<Map<String, String>> _spots = [];
   List<Map<String, dynamic>> _entries = [];
   List<_SeasonPeriod> _seasonPeriods = [];
+  final GlobalKey _monthlySummaryKey = GlobalKey();
   int _loadSerial = 0;
 
   String? _selectedSpotId;
@@ -243,15 +244,36 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
     }
   }
 
+  bool get _canGoToNextMonth {
+    final now = DateTime.now();
+    return DateTime(_selectedMonth.year, _selectedMonth.month)
+        .isBefore(DateTime(now.year, now.month));
+  }
+
   Future<void> _changeMonth(int delta) async {
+    final target = DateTime(
+      _selectedMonth.year,
+      _selectedMonth.month + delta,
+    );
+    final now = DateTime.now();
+    if (target.isAfter(DateTime(now.year, now.month))) return;
+
     setState(() {
-      _selectedMonth = DateTime(
-        _selectedMonth.year,
-        _selectedMonth.month + delta,
-      );
+      _selectedMonth = target;
     });
 
     await _loadStats();
+  }
+
+  Future<void> _scrollToBilans() async {
+    final context = _monthlySummaryKey.currentContext;
+    if (context == null) return;
+    await Scrollable.ensureVisible(
+      context,
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeInOutCubic,
+      alignment: 0.02,
+    );
   }
 
   int? _entryMillis(Map<String, dynamic> entry) {
@@ -445,10 +467,10 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
           ),
           IconButton(
             visualDensity: VisualDensity.compact,
-            onPressed: () => _changeMonth(1),
-            icon: const Icon(
+            onPressed: _canGoToNextMonth ? () => _changeMonth(1) : null,
+            icon: Icon(
               Icons.chevron_right_rounded,
-              color: _statsColor,
+              color: _canGoToNextMonth ? _statsColor : Colors.black26,
             ),
           ),
         ],
@@ -507,12 +529,22 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
             const SizedBox(height: 2),
             Text(
               value.toString(),
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
             ),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 8, fontWeight: FontWeight.w800),
+            const SizedBox(height: 2),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
             ),
           ],
         ),
@@ -631,7 +663,13 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
   }
 
   Widget _dayCard(_DailyStats stats) {
-    final factEntries = stats.facts.entries.toList()
+    // Les catégories des trois compteurs ne sont plus répétées sous FAITS.
+    final factEntries = stats.facts.entries.where((entry) {
+      final type = entry.key.trim().toLowerCase();
+      return type != 'incident' &&
+          type != 'intervention' &&
+          type != 'personne recherchée';
+    }).toList()
       ..sort((a, b) => a.key.compareTo(b.key));
 
     return Container(
@@ -685,7 +723,7 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
             _eventRow(stats.summary),
           ],
           const SizedBox(height: 8),
-          if (factEntries.isEmpty)
+          if (stats.facts.isEmpty)
             const Text(
               'Aucun fait enregistré.',
               style: TextStyle(
@@ -694,7 +732,7 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
                 fontWeight: FontWeight.w700,
               ),
             )
-          else ...[
+          else if (factEntries.isNotEmpty) ...[
             const Text(
               'FAITS',
               style: TextStyle(
