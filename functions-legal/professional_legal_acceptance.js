@@ -107,6 +107,41 @@ async function adminChangeHistory(db, current, recorded, versionId) {
   });
 }
 
+
+// Même protocole de comparaison que l'ADMIN, mais avec ses propres
+// archives et preuves d'acceptation. Les publications non archivées
+// n'autorisent jamais la fabrication de différences approximatives.
+async function advertiserChangeHistory(db, current, recorded, versionId) {
+  const revision = current.revision;
+  if (!Number.isSafeInteger(revision) || revision <= 0) return null;
+  const previousId = clean(recorded?.versionId);
+  const match = /^([^:]+):r(\d+)$/.exec(previousId);
+  const trustedAcceptance = recorded?.accepted === true &&
+    recorded?.documentId === "advertiserCgu" &&
+    match !== null && Number(match[2]) < revision;
+  const baselineRevision = trustedAcceptance ? Number(match[2]) : revision - 1;
+  if (!Number.isSafeInteger(baselineRevision) ||
+      baselineRevision < 0 || baselineRevision >= revision) return null;
+  const root = "advertiserCgu_r" +
+    String(baselineRevision).padStart(8, "0");
+  const history = db.collection("legalVersions");
+  const [published, legacy] = await Promise.all([
+    history.doc(root + "_published").get(),
+    history.doc(root + "_legacy").get(),
+  ]);
+  const previous = [legacy.data(), published.data()].find((data) =>
+    data?.documentId === "advertiserCgu" &&
+    data?.revision === baselineRevision &&
+    Array.isArray(data?.chapters) && data.chapters.length === 12 &&
+    (!trustedAcceptance || data.version === match[1]));
+  if (!previous || !clean(previous.version)) return null;
+  return buildAdminChanges(previous.chapters, current.chapters, {
+    baselineVersionId: previous.version + ":r" + previous.revision,
+    versionId,
+    baselineKind: trustedAcceptance ? "lastAccepted" : "previousPublished",
+  });
+}
+
 async function action({admin, token, input}) {
   const actor = activeProfile(token);
   const request = validateInput(input);
@@ -126,16 +161,25 @@ async function action({admin, token, input}) {
     const required = requiresAcceptance(current, recorded.data());
     const result = {published: true, required,
       documentId: actor.documentId, versionId};
-    // Seul ADMIN reçoit les écarts éditoriaux. PUBLICITAIRE reste identique.
-    if (actor.role === "ADMIN" && required) {
+    // Les profils professionnels conservent leurs archives distinctes.
+    // Une comparaison indisponible entraîne la lecture intégrale,
+    // sans jamais supprimer l'obligation de nouvelle acceptation.
+    if (required && actor.role === "ADMIN") {
       try {
         result.adminChanges = await adminChangeHistory(db, legal.data(),
             recorded.data(), versionId);
       } catch (error) {
-        // Une archive indisponible ne doit jamais contourner les CGU :
-        // l'interface affiche alors le texte complet.
         console.warn("Historique CGU ADMIN indisponible :", error);
         result.adminChanges = null;
+      }
+    }
+    if (required && actor.role === "ANNONCEUR") {
+      try {
+        result.advertiserChanges = await advertiserChangeHistory(db,
+            legal.data(), recorded.data(), versionId);
+      } catch (error) {
+        console.warn("Historique CGU PUBLICITAIRE indisponible :", error);
+        result.advertiserChanges = null;
       }
     }
     return result;
@@ -195,4 +239,5 @@ function register({admin, onRequest}) {
   });
 }
 module.exports = {PROFILES, activeProfile, legalVersion,
-  requiresAcceptance, validateInput, adminChangeHistory, action, register};
+  requiresAcceptance, validateInput, adminChangeHistory,
+  advertiserChangeHistory, action, register};

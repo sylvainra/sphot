@@ -279,12 +279,13 @@ test("ADMIN : archive absente signifie CGU integrales, sans inventer de diff", a
   assert.equal(result.adminChanges, null);
 });
 
-test("PUBLICITAIRE : le contrat de statut ne change pas", async () => {
+test("PUBLICITAIRE : statut conserve le profil isole", async () => {
   const f = fixture("ANNONCEUR");
   const status = await action({admin: f.admin, token: f.token,
     input: {action: "status"}});
   assert.equal(status.required, true);
   assert.equal(Object.hasOwn(status, "adminChanges"), false);
+  assert.equal(status.advertiserChanges, null);
 });
 
 test("ADMIN : la copie legacy exacte prime sur une version publiee obsolete", async () => {
@@ -312,4 +313,97 @@ test("ADMIN : la copie legacy exacte prime sur une version publiee obsolete", as
       ["07"]);
   assert.equal(status.adminChanges.articles[0].blocks[0].after,
       "Clause finale actualisée.");
+});
+
+test("PUBLICITAIRE : lecture ciblee depuis la derniere publication", async () => {
+  const f = fixture("ANNONCEUR");
+  const current = f.docs.get("legalDocuments/advertiserCgu");
+  current.version = "1.6";
+  current.revision = 2;
+  const previous = JSON.parse(JSON.stringify(current.chapters));
+  previous[3].content = "Texte commun.\n\nAncienne regle.\n\nFin.";
+  current.chapters[3].content = "Texte commun.\n\nNouvelle regle.\n\nFin.";
+  f.docs.set("legalVersions/advertiserCgu_r00000001_legacy", {
+    documentId: "advertiserCgu", version: "1.5", revision: 1,
+    chapters: previous,
+  });
+  const status = await action({admin: f.admin, token: f.token,
+    input: {action: "status"}});
+  assert.equal(status.advertiserChanges.baselineKind, "previousPublished");
+  assert.equal(status.advertiserChanges.baselineVersionId, "1.5:r1");
+  assert.equal(status.advertiserChanges.articleCount, 1);
+  assert.equal(status.advertiserChanges.articles[0].id, "04");
+  assert.deepEqual(status.advertiserChanges.articles[0].blocks, [
+    {before: "Ancienne regle.", after: "Nouvelle regle."},
+  ]);
+  assert.equal(Object.hasOwn(status, "adminChanges"), false);
+});
+
+test("PUBLICITAIRE : version acceptee connue et plusieurs modifications", async () => {
+  const f = fixture("ANNONCEUR");
+  const current = f.docs.get("legalDocuments/advertiserCgu");
+  current.version = "1.8";
+  current.revision = 4;
+  const previous = JSON.parse(JSON.stringify(current.chapters));
+  previous[0].content = "Ancien article 1";
+  previous[1].content = "Ancien article 2";
+  current.chapters[0].content = "Nouvel article 1";
+  current.chapters[1].content = "Nouvel article 2";
+  f.docs.set("professionalLegalAcceptances/ANNONCEUR_" + f.token.uid, {
+    accepted: true, documentId: "advertiserCgu", versionId: "1.2:r1",
+  });
+  f.docs.set("legalVersions/advertiserCgu_r00000001_published", {
+    documentId: "advertiserCgu", version: "1.2", revision: 1,
+    chapters: previous,
+  });
+  const status = await action({admin: f.admin, token: f.token,
+    input: {action: "status"}});
+  assert.equal(status.required, true);
+  assert.equal(status.advertiserChanges.baselineKind, "lastAccepted");
+  assert.equal(status.advertiserChanges.baselineVersionId, "1.2:r1");
+  assert.equal(status.advertiserChanges.articleCount, 2);
+  assert.deepEqual(status.advertiserChanges.articles.map((x) => x.id),
+      ["01", "02"]);
+});
+
+test("PUBLICITAIRE : archive incorrecte ou revision initiale repli integral", async () => {
+  const f = fixture("ANNONCEUR");
+  const current = f.docs.get("legalDocuments/advertiserCgu");
+  current.version = "1.6";
+  current.revision = 0;
+  let status = await action({admin: f.admin, token: f.token,
+    input: {action: "status"}});
+  assert.equal(status.required, true);
+  assert.equal(status.advertiserChanges, null);
+  current.revision = 1;
+  f.docs.set("legalVersions/advertiserCgu_r00000000_legacy", {
+    documentId: "adminCgu", version: "1.5", revision: 0,
+    chapters: current.chapters,
+  });
+  status = await action({admin: f.admin, token: f.token,
+    input: {action: "status"}});
+  assert.equal(status.advertiserChanges, null);
+});
+
+test("PUBLICITAIRE : preuve acceptation toujours archivee et non reexigee", async () => {
+  const f = fixture("ANNONCEUR");
+  const current = f.docs.get("legalDocuments/advertiserCgu");
+  current.version = "1.6";
+  current.revision = 0;
+  const first = await action({admin: f.admin, token: f.token,
+    input: {action: "accept", versionId: "1.6:r0", accepted: true}});
+  assert.equal(first.accepted, true);
+  const accepted = await action({admin: f.admin, token: f.token,
+    input: {action: "status"}});
+  assert.equal(accepted.required, false);
+  assert.equal(Object.hasOwn(accepted, "advertiserChanges"), false);
+  assert.equal([...f.docs.keys()].filter((key) => key.startsWith(
+      "professionalLegalAcceptances/ANNONCEUR_" + f.token.uid +
+      "/history/")).length, 1);
+  // Une mise a jour ulterieure doit declencher une nouvelle acceptation.
+  current.version = "1.7";
+  current.revision = 1;
+  const newStatus = await action({admin: f.admin, token: f.token,
+    input: {action: "status"}});
+  assert.equal(newStatus.required, true);
 });
