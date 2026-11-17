@@ -39,6 +39,7 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
   final List<Map<String, String>> _spots = [];
   List<Map<String, dynamic>> _entries = [];
   List<_SeasonPeriod> _seasonPeriods = [];
+  bool _seasonDataAvailable = true;
   final GlobalKey _monthlySummaryKey = GlobalKey();
   int _loadSerial = 0;
 
@@ -210,8 +211,7 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
 
       final decoded = jsonDecode(response.body);
       if (decoded is! Map<String, dynamic> ||
-          decoded['entries'] is! List ||
-          decoded['seasonPeriods'] is! List) {
+          decoded['entries'] is! List) {
         throw const FormatException('Réponse de statistiques incomplète.');
       }
 
@@ -219,7 +219,11 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
           .whereType<Map>()
           .map((value) => Map<String, dynamic>.from(value))
           .toList();
-      final periods = (decoded['seasonPeriods'] as List)
+      final hasSeasonData = decoded['seasonPeriods'] is List;
+      final rawPeriods = hasSeasonData
+          ? decoded['seasonPeriods'] as List
+          : const <dynamic>[];
+      final periods = rawPeriods
           .whereType<Map>()
           .map((value) => _SeasonPeriod(
                 startDay: (value['startDay'] as num).toInt(),
@@ -231,6 +235,7 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
       setState(() {
         _entries = entries;
         _seasonPeriods = periods;
+        _seasonDataAvailable = hasSeasonData;
         _loading = false;
       });
     } catch (_) {
@@ -903,7 +908,13 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
               fontWeight: pw.FontWeight.bold,
             ),
           ),
-          if (_seasonPeriods.isEmpty)
+          if (!_seasonDataAvailable)
+            pw.Text(
+              'Bilan saisonnier indisponible : mise à jour serveur '
+              'nécessaire.',
+              style: const pw.TextStyle(fontSize: 9),
+            )
+          else if (_seasonPeriods.isEmpty)
             pw.Text(
               'Aucune période de surveillance affectée à ce poste.',
               style: const pw.TextStyle(fontSize: 9),
@@ -1202,14 +1213,24 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
                                                     : 'Toutes les périodes de surveillance',
                                               )
                                             else
-                                              const Padding(
-                                                padding: EdgeInsets.all(12),
+                                              Padding(
+                                                padding:
+                                                    const EdgeInsets.all(12),
                                                 child: Text(
-                                                  'Bilan saisonnier indisponible : '
-                                                  'aucune période de surveillance '
-                                                  'affectée à ce poste.',
+                                                  !_seasonDataAvailable
+                                                      ? 'Bilan saisonnier '
+                                                          'indisponible : '
+                                                          'mise à jour '
+                                                          'du serveur nécessaire.'
+                                                      : 'Bilan saisonnier '
+                                                          'indisponible : '
+                                                          'aucune période '
+                                                          'de surveillance '
+                                                          'affectée à ce poste.',
                                                   textAlign: TextAlign.center,
-                                                  style: TextStyle(fontSize: 10),
+                                                  style: const TextStyle(
+                                                    fontSize: 10,
+                                                  ),
                                                 ),
                                               ),
                                             const SizedBox(height: 4),
