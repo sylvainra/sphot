@@ -943,9 +943,12 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
           ),
           pw.SizedBox(height: 5),
           ...stats.map((day) {
-            final facts = day.facts.entries
-                .map((entry) => '${entry.key}: ${entry.value}')
-                .join(' | ');
+            final facts = day.facts.entries.where((entry) {
+              final type = entry.key.trim().toLowerCase();
+              return type != 'incident' &&
+                  type != 'intervention' &&
+                  type != 'personne recherchée';
+            }).map((entry) => '${entry.key}: ${entry.value}').join(' | ');
             final rescue = day.rescueQualifications.entries
                 .map((entry) => '${entry.key}: ${entry.value}')
                 .join(' | ');
@@ -976,7 +979,9 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
                     style: const pw.TextStyle(fontSize: 8),
                   ),
                   pw.Text(
-                    facts.isEmpty ? 'Faits : aucun' : 'Faits : $facts',
+                    facts.isEmpty
+                        ? 'Autres faits : aucun'
+                        : 'Autres faits : $facts',
                     style: const pw.TextStyle(fontSize: 8),
                   ),
                   pw.Text(
