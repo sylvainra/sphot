@@ -107,6 +107,43 @@ async function adminChangeHistory(db, current, recorded, versionId) {
   });
 }
 
+
+// Historique annonceur : ne suppose jamais que la publication precedente
+// avait ete acceptee. Si une archive fiable manque, le client lit les 12 CGU.
+async function advertiserChangeHistory(db, current, recorded, versionId) {
+  const revision = current.revision;
+  if (!Number.isSafeInteger(revision) || revision < 0) return null;
+  const previousId = clean(recorded?.versionId);
+  const match = /^([^:]+):r(\d+)$/.exec(previousId);
+  const acceptedRevision = match === null ? -1 : Number(match[2]);
+  const trustedAcceptance = recorded?.accepted === true &&
+    recorded?.documentId === "advertiserCgu" &&
+    match !== null && Number.isSafeInteger(acceptedRevision) &&
+    acceptedRevision <= revision && previousId !== versionId;
+  const baselineRevision = trustedAcceptance ? acceptedRevision :
+    Math.max(0, revision - 1);
+  const root = "advertiserCgu_r" +
+    String(baselineRevision).padStart(8, "0");
+  const history = db.collection("legalVersions");
+  const [legacy, published] = await Promise.all([
+    history.doc(root + "_legacy").get(),
+    history.doc(root + "_published").get(),
+  ]);
+  const previous = [legacy.data(), published.data()].find((data) =>
+    data?.documentId === "advertiserCgu" &&
+    data?.revision === baselineRevision &&
+    Array.isArray(data?.chapters) && data.chapters.length === 12 &&
+    clean(data?.version) &&
+    (baselineRevision !== revision || data.version !== current.version) &&
+    (!trustedAcceptance || data.version === match[1]));
+  if (!previous) return null;
+  return buildAdminChanges(previous.chapters, current.chapters, {
+    baselineVersionId: previous.version + ":r" + previous.revision,
+    baselineKind: trustedAcceptance ? "lastAccepted" : "previousPublished",
+    versionId,
+  });
+}
+
 async function action({admin, token, input}) {
   const actor = activeProfile(token);
   const request = validateInput(input);
@@ -126,16 +163,24 @@ async function action({admin, token, input}) {
     const required = requiresAcceptance(current, recorded.data());
     const result = {published: true, required,
       documentId: actor.documentId, versionId};
-    // Seul ADMIN reçoit les écarts éditoriaux. PUBLICITAIRE reste identique.
     if (actor.role === "ADMIN" && required) {
       try {
         result.adminChanges = await adminChangeHistory(db, legal.data(),
             recorded.data(), versionId);
       } catch (error) {
-        // Une archive indisponible ne doit jamais contourner les CGU :
-        // l'interface affiche alors le texte complet.
+        // Une archive indisponible ne doit jamais contourner les CGU.
         console.warn("Historique CGU ADMIN indisponible :", error);
         result.adminChanges = null;
+      }
+    }
+    if (actor.role === "ANNONCEUR" && required) {
+      try {
+        result.advertiserChanges = await advertiserChangeHistory(
+            db, legal.data(), recorded.data(), versionId);
+      } catch (error) {
+        // En cas d'échec, présentation des 12 articles intégraux.
+        console.warn("Historique CGU PUBLICITAIRE indisponible :", error);
+        result.advertiserChanges = null;
       }
     }
     return result;
@@ -195,4 +240,5 @@ function register({admin, onRequest}) {
   });
 }
 module.exports = {PROFILES, activeProfile, legalVersion,
-  requiresAcceptance, validateInput, adminChangeHistory, action, register};
+  requiresAcceptance, validateInput, adminChangeHistory,
+  advertiserChangeHistory, action, register};
