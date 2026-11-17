@@ -258,8 +258,16 @@ function safeScopedMerge(local, base, feature) {
       "Un autre import du helper STATS existe : contrôle manuel nécessaire");
     } else if (result.split(helperAnchor).length === 2) {
       result = result.replace(helperAnchor, helperAnchor + helper);
+    } else if (lifecycleImports.length === 1 &&
+        result.includes(lifecycleImports[0][0] + "\n")) {
+      // The standalone year import creates a second generic "}=require"
+      // anchor; retain the original block's position rather than prepending.
+      const originalImport = lifecycleImports[0][0] + "\n";
+      assert(result.split(originalImport).length === 2,
+          "Import lifecycle local répété : examen manuel");
+      result = result.replace(originalImport, originalImport + helper);
     } else {
-      // Some local versions do not use a destructured lifecycle import.
+      // Some local versions have no recognized lifecycle import at all.
       const strict = result.match(/^(?:"use strict"|'use strict');\n/);
       const at = strict ? strict[0].length : 0;
       result = result.slice(0, at) + helper + result.slice(at);
