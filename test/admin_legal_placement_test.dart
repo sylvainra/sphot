@@ -80,7 +80,13 @@ void main() {
 
     expect(find.text('CARTE ET CINQ ETAPES ADMIN'), findsOneWidget);
     expect(find.text('ACCEPTER LES CGU'), findsOneWidget);
-    expect(find.byType(ModalBarrier), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(AdminLegalOverlay),
+        matching: find.byType(ModalBarrier),
+      ),
+      findsOneWidget,
+    );
     expect(find.byType(ExcludeFocus), findsOneWidget);
     expect(find.byType(PopScope), findsOneWidget);
 
