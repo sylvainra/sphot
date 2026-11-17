@@ -34,8 +34,8 @@ class ProfessionalLegalGate extends StatefulWidget {
   final ProfessionalLegalAudience audience;
   final Widget child;
 
-  /// Décor réel du dashboard Admin pendant le verrou juridique.
-  /// Le parcours PUBLICITAIRE n'utilise pas cette propriété.
+  /// Décor du véritable espace professionnel pendant le verrou juridique.
+  /// La carte reste visible mais non interactive jusqu'à acceptation.
   final Widget? lockedDashboard;
 
   @override
@@ -160,9 +160,7 @@ class _ProfessionalLegalGateState extends State<ProfessionalLegalGate> {
               .map((part) => Map<String, dynamic>.from(part))
               .toList(),
           child: widget.child,
-          lockedDashboard: widget.audience == ProfessionalLegalAudience.admin
-              ? widget.lockedDashboard
-              : null,
+          lockedDashboard: widget.lockedDashboard,
         );
       },
     );
@@ -204,6 +202,8 @@ class _PublishedProfessionalLegalGateState
   bool _acknowledged = false;
   bool _adminShowFullDocument = false;
   Map<String, dynamic>? _adminChanges;
+  Map<String, dynamic>? _advertiserChanges;
+  bool _advertiserShowFullDocument = false;
   String? _error;
 
   @override
@@ -267,6 +267,11 @@ class _PublishedProfessionalLegalGateState
             ? Map<String, dynamic>.from(result['adminChanges'] as Map)
             : null;
         _adminShowFullDocument = false;
+        _advertiserChanges = widget.documentId == 'advertiserCgu' &&
+                result['advertiserChanges'] is Map
+            ? Map<String, dynamic>.from(result['advertiserChanges'] as Map)
+            : null;
+        _advertiserShowFullDocument = false;
         _loading = false;
       });
     } catch (error) {
@@ -521,6 +526,193 @@ class _PublishedProfessionalLegalGateState
     );
   }
 
+  List<Map<String, dynamic>> get _advertiserModifiedArticles {
+    final rows = _advertiserChanges?['articles'];
+    if (rows is! List) return <Map<String, dynamic>>[];
+    return rows.whereType<Map>()
+        .map((row) => Map<String, dynamic>.from(row)).toList();
+  }
+
+  Widget _advertiserAcceptancePanel() {
+    const blue = Color(0xFF213F8E);
+    const purple = Color(0xFF6544A8);
+    final changes = _advertiserModifiedArticles;
+    final targeted = changes.isNotEmpty;
+    final baseline = (_advertiserChanges?['baselineVersionId'] ?? '')
+        .toString();
+    final acceptedBaseline =
+        _advertiserChanges?['baselineKind'] == 'lastAccepted';
+    final full = _advertiserShowFullDocument || !targeted;
+
+    return Column(
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(17, 14, 17, 13),
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF18356F), Color(0xFF3154A1)],
+            ),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.verified_user_outlined,
+                color: Colors.white, size: 26),
+              const SizedBox(width: 10),
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('MODIFICATIONS DES CGU SPHOT PUBLICITAIRE',
+                    style: TextStyle(fontSize: 15,
+                      fontWeight: FontWeight.w900, color: Colors.white)),
+                  const SizedBox(height: 3),
+                  Text('Version publiée ${widget.versionId}',
+                    style: const TextStyle(fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFE1E9FF))),
+                ],
+              )),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(15, 12, 15, 14),
+            children: [
+              if (targeted) ...[
+                Text('${changes.length} article(s) modifié(s)',
+                  style: const TextStyle(fontSize: 13,
+                    fontWeight: FontWeight.w800, color: blue)),
+                const SizedBox(height: 8),
+                Text(
+                  acceptedBaseline
+                      ? 'Comparaison avec les CGU précédemment acceptées '
+                        '($baseline). Seuls les passages modifiés sont affichés.'
+                      : 'Comparaison avec la publication précédente '
+                        '($baseline). L’ancienne acceptation de ce compte '
+                        'n’est pas identifiable dans ce registre.',
+                  style: const TextStyle(
+                    fontSize: 12, height: 1.35, color: blue),
+                ),
+                const SizedBox(height: 12),
+                ...changes.map(_adminChangedArticle),
+                TextButton.icon(
+                  onPressed: () => setState(() =>
+                    _advertiserShowFullDocument =
+                        !_advertiserShowFullDocument),
+                  icon: Icon(_advertiserShowFullDocument
+                      ? Icons.expand_less : Icons.menu_book_outlined),
+                  label: Text(_advertiserShowFullDocument
+                      ? 'MASQUER LES CGU COMPLÈTES'
+                      : 'CONSULTER LES ${widget.chapters.length} ARTICLES '
+                        'DES CGU COMPLÈTES'),
+                ),
+              ] else ...[
+                const Text(
+                  'La comparaison historique n’est pas disponible ou '
+                  'ne révèle aucun passage différent. '
+                  'Les CGU publiées sont présentées intégralement.',
+                  style: TextStyle(fontSize: 13, color: blue),
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (full)
+                ...widget.chapters.map((chapter) => Card(
+                  margin: const EdgeInsets.only(bottom: 7),
+                  color: const Color(0xFFF6F7FB),
+                  child: ExpansionTile(
+                    title: Text((chapter['title'] ?? '').toString(),
+                      style: const TextStyle(color: blue,
+                        fontSize: 13, fontWeight: FontWeight.w700)),
+                    childrenPadding:
+                        const EdgeInsets.fromLTRB(15, 0, 15, 15),
+                    children: [
+                      SphotLegalArticleMarkdown(
+                        markdown: (chapter['content'] ?? '').toString()),
+                    ],
+                  ),
+                )),
+            ],
+          ),
+        ),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(14, 4, 14, 9),
+          decoration: const BoxDecoration(
+            color: Color(0xFFF5F7FB),
+            border: Border(top: BorderSide(color: Color(0xFFD8DFEB))),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CheckboxListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                activeColor: purple,
+                value: _acknowledged,
+                onChanged: _submitting ? null : (value) =>
+                    setState(() => _acknowledged = value ?? false),
+                title: Text(
+                  'J’ai pris connaissance des modifications et '
+                  'j’accepte l’intégralité des CGU SPHOT PUBLICITAIRE, '
+                  'version ${widget.versionId}.',
+                  style: const TextStyle(color: blue,
+                    fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ),
+              Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 10,
+                runSpacing: 6,
+                children: [
+                  TextButton.icon(
+                    onPressed: _submitting ? null :
+                        () => _leaveAdminLegalGate(context),
+                    icon: const Icon(Icons.logout_outlined, size: 17),
+                    label: const Text('SE DÉCONNECTER'),
+                  ),
+                  FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: purple),
+                    onPressed: !_acknowledged || _submitting ? null : _accept,
+                    icon: const Icon(Icons.check_circle_outline, size: 17),
+                    label: Text(_submitting
+                        ? 'ENREGISTREMENT…' : 'ACCEPTER ET CONTINUER'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _advertiserLockedDashboard() {
+    final status = _loading
+        ? AdminLegalStatusPanel(
+            title: 'Vérification des CGU SPHOT PUBLICITAIRE',
+            detail: 'Chargement de votre acceptation…',
+            loading: true,
+            onSignOut: () => _leaveAdminLegalGate(context),
+          )
+        : _error != null
+            ? AdminLegalStatusPanel(
+                title: 'Vérification des CGU impossible',
+                detail: _error.toString(),
+                onRetry: _check,
+                onSignOut: () => _leaveAdminLegalGate(context),
+              )
+            : _advertiserAcceptancePanel();
+
+    return AdminLegalOverlay(
+      dashboard: widget.lockedDashboard ?? widget.child,
+      fullHeight: !_loading && _error == null,
+      panel: status,
+    );
+  }
+
   Widget _adminLockedDashboard() {
     final status = _loading
         ? AdminLegalStatusPanel(
@@ -547,11 +739,13 @@ class _PublishedProfessionalLegalGateState
 
   @override
   Widget build(BuildContext context) {
-    // Seul SPHOT ADMIN change de présentation : l'annonceur conserve
-    // son écran juridique existant, sans modification de son parcours.
     if (widget.documentId == 'adminCgu') {
       if (!_loading && _error == null && !_required) return widget.child;
       return _adminLockedDashboard();
+    }
+    if (widget.documentId == 'advertiserCgu') {
+      if (!_loading && _error == null && !_required) return widget.child;
+      return _advertiserLockedDashboard();
     }
 
     if (_loading) {
