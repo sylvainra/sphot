@@ -1104,6 +1104,42 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
                           children: [
                             // Le SPHOT est choisi uniquement dans le menu Sauveteur.
                             _monthNavigation(),
+                            const SizedBox(height: 6),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 34,
+                              child: OutlinedButton.icon(
+                                onPressed: _loading ||
+                                        _error != null ||
+                                        _selectedSpotId == null
+                                    ? null
+                                    : _scrollToBilans,
+                                icon: const Icon(
+                                  Icons.analytics_outlined,
+                                  size: 17,
+                                ),
+                                label: const Text(
+                                  'VOIR LES BILANS',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: _statsColor,
+                                  side: const BorderSide(
+                                    color: _statsColor,
+                                    width: 1.3,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                  ),
+                                ),
+                              ),
+                            ),
                             const SizedBox(height: 8),
                             Expanded(
                               child: _loading
@@ -1120,8 +1156,11 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
                                             ),
                                           ),
                                         )
-                                      : ListView(
-                                          children: [
+                                      : SingleChildScrollView(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.stretch,
+                                            children: [
                                             ...stats.map(_dayCard),
                                             if (!stats.any(_hasActivity))
                                               const Padding(
@@ -1135,13 +1174,16 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
                                                   ),
                                                 ),
                                               ),
-                                            _summaryCard(
-                                              title: 'BILAN MENSUEL',
-                                              summary: _monthlySummary,
-                                              subtitle: _monthLabel +
-                                                  (_monthlyProvisional
-                                                      ? ' - PROVISOIRE'
-                                                      : ' - CLÔTURÉ'),
+                                            KeyedSubtree(
+                                              key: _monthlySummaryKey,
+                                              child: _summaryCard(
+                                                title: 'BILAN MENSUEL',
+                                                summary: _monthlySummary,
+                                                subtitle: _monthLabel +
+                                                    (_monthlyProvisional
+                                                        ? ' - PROVISOIRE'
+                                                        : ' - CLÔTURÉ'),
+                                              ),
                                             ),
                                             if (_seasonPeriods.isNotEmpty)
                                               _summaryCard(
@@ -1212,7 +1254,8 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
                                                 ),
                                               ),
                                             ),
-                                          ],
+                                            ],
+                                          ),
                                         ),
                             ),
                           ],
