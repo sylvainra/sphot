@@ -1,0 +1,65 @@
+name: SPHOT - Validation technique STATS Sauveteur
+
+on:
+  pull_request:
+    paths:
+      - "lib/pages/sauveteur/sauveteur_stats_page.dart"
+      - "functions/index.js"
+      - "functions/sauveteur_stats_support.js"
+      - "functions/test/sauveteur_stats_bilans.test.js"
+      - "test/sauveteur_stats_display_test.dart"
+      - ".github/workflows/sauveteur-stats-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  node-stats:
+    name: Node - statistiques et non-regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Installer les dependances Firebase sans deployer
+        run: npm --prefix functions ci
+      - name: Analyse lint Firebase
+        run: npm --prefix functions run lint
+      - name: Verifier la syntaxe
+        run: |
+          node --check functions/index.js
+          node --check functions/sauveteur_stats_support.js
+          node --check functions/test/sauveteur_stats_bilans.test.js
+      - name: Tester les statistiques et le cycle de vie
+        run: |
+          node --test \
+            functions/test/sauveteur_stats_bilans.test.js \
+            functions/test/sauveteur_main_courante_lifecycle.test.js
+
+  flutter-stats:
+    name: Flutter - analyse et tests STATS
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - name: Installer Flutter stable
+        run: |
+          git clone --depth 1 --branch stable https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/flutter/bin/flutter" --version
+      - name: Installer les dependances Flutter
+        run: flutter pub get
+      - name: Analyser STATS et son test
+        run: |
+          flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings \
+            lib/pages/sauveteur/sauveteur_stats_page.dart \
+            test/sauveteur_stats_display_test.dart
+      - name: Executer les tests Flutter de non-regression
+        run: |
+          flutter test --no-pub \
+            test/sauveteur_stats_display_test.dart \
+            test/sauveteur_flag_rules_test.dart \
+            test/sauveteur_preparation_rules_test.dart
