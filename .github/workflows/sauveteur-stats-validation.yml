@@ -50,9 +50,10 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - name: Installer Flutter stable
+      # Version compatible avec Gradle 8.14 et AGP 8.11.1 du depot.
+      - name: Installer Flutter 3.47.7
         run: |
-          git clone --depth 1 --branch stable https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          git clone --depth 1 --branch 3.47.7 https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
           echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
           "$RUNNER_TEMP/flutter/bin/flutter" --version
           "$RUNNER_TEMP/flutter/bin/flutter" config --jdk-dir="$JAVA_HOME"
