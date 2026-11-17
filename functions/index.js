@@ -12096,7 +12096,7 @@ exports.getSauveteurStats = onRequest(
                 period.endDay >= period.startDay &&
                 period.startDay <= year * 10000 + 1231 &&
                 period.endDay >= year * 10000 + 101);
-                await admin.firestore()
+        await admin.firestore()
             .collection("mainCouranteAccessLogs")
             .add({
               territoireId: context.territoireId,
