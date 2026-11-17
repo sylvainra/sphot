@@ -524,11 +524,13 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
           border: Border.all(color: color.withOpacity(0.75), width: 1),
         ),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Icon(icon, size: 17, color: color),
+            Center(child: Icon(icon, size: 17, color: color)),
             const SizedBox(height: 2),
             Text(
               value.toString(),
+              textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 2),
