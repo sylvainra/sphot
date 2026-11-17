@@ -107,6 +107,7 @@ test("les bilans et le PDF utilisent les recherches distinctes " +
   assert.match(ui, /Bilan de saison /);
   assert.match(ui, /Recherches distinctes : /);
   assert.match(ui, /_eventRow\(stats\.summary\)/);
+  assert.ok(ui.includes("'Autres faits : aucun'"));
 });
 
 test("les faits journaliers ne répètent pas les trois compteurs", () => {
@@ -128,7 +129,9 @@ test("libellés des compteurs agrandis et adaptés à la largeur", () => {
   const count = ui.split("Widget _eventCount({")[1]
       .split("Widget _eventRow(")[0];
   for (const token of ["fontSize: 16", "fontSize: 10.5",
-    "FittedBox(", "BoxFit.scaleDown"]) {
+    "FittedBox(", "BoxFit.scaleDown",
+    "crossAxisAlignment: CrossAxisAlignment.stretch",
+    "textAlign: TextAlign.center"]) {
     assert.ok(count.includes(token));
   }
 });
