@@ -17,7 +17,8 @@ void main() {
         r'Widget build\(BuildContext context\)\s*=>\s*'
         r'ProfessionalLegalGate\(\s*'
         r'audience:\s*ProfessionalLegalAudience\.admin,\s*'
-        r'child:\s*_buildDashboardContent\(context\),\s*\);',
+        r'child:\s*_buildDashboardContent\(context\),\s*'
+        r'lockedDashboard:\s*_buildAdminLegalBackdrop\(\),\s*\);',
       ).hasMatch(dashboard),
       isTrue,
     );
