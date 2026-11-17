@@ -91,11 +91,24 @@ git diff -- functions/index.js
 
 Le script tente d'abord un merge Git à trois versions. Si ce merge
 signale des conflits (notamment avec le travail local Odoo/Admin), il utilise
-une **fusion ciblée** de l'import, de la seule fonction getSauveteurStats et
+une **fusion ciblée** de l'import, de la fonction getSauveteurStats et
 des deux insertions d'identifiant dans updateSauveteurLiveState.
-Avant toute écriture, il vérifie que ce calcul reproduit EXACTEMENT
-le commit STATS cible depuis le commit initial. Si l'une de ces zones STATS
-a elle-même été modifiée localement, il refuse la fusion : aucune écriture.
+Le diagnostic local du 17/11/2026 a identifié exactement deux variantes
+de getSauveteurStats par rapport au commit initial :
+- autorisation `context.realtimeSpotIds.includes(spotId)` plutôt que
+  `assignedSpotIds` et `supervisedSpotIds` séparés (le contexte realtime
+  est lui-même restreint aux postes affectés, supervisés et autorisés) ;
+- requête filtrée sur `dayStartMillis/dayEndMillis` avec `limit(500)`
+  plutôt que `mainCouranteReadBounds`.
+
+La version cible STATS conserve la règle `realtimeSpotIds`, applique
+`mainCouranteReadBounds` et effectue la pagination des faits.
+Une variante locale n'est acceptée que si elle correspond strictement
+à ces deux différences ; toute autre différence de la fonction STATS
+stoppe l'opération, sans écrasement.
+
+Avant toute écriture, le script vérifie que son calcul reproduit EXACTEMENT
+le commit STATS cible depuis le commit initial.
 Il conserve une sauvegarde dans le répertoire temporaire du système et
 refuse d'écraser un fichier auxiliaire déjà différent. En cas de refus,
 **ne pas forcer** le déploiement : examiner le message et réaliser une
