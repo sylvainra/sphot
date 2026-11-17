@@ -313,3 +313,79 @@ test("ADMIN : la copie legacy exacte prime sur une version publiee obsolete", as
   assert.equal(status.adminChanges.articles[0].blocks[0].after,
       "Clause finale actualisée.");
 });
+
+test("PUBLICITAIRE : nouvelle publication r0 avec archive affiche les passages modifies", async () => {
+  const f = fixture("ANNONCEUR");
+  const current = f.docs.get("legalDocuments/advertiserCgu");
+  current.version = "1.6";
+  current.revision = 0;
+  const previous = JSON.parse(JSON.stringify(current.chapters));
+  previous[3].content = "Début intact.\n\nAncienne clause.\n\nFin intacte.";
+  current.chapters[3].content =
+      "Début intact.\n\nNouvelle clause.\n\nFin intacte.";
+  f.docs.set("legalVersions/advertiserCgu_r00000000_legacy", {
+    documentId: "advertiserCgu",
+    version: "1.5", revision: 0, chapters: previous,
+  });
+  const status = await action({admin: f.admin, token: f.token,
+    input: {action: "status"}});
+  assert.equal(status.required, true);
+  assert.equal(status.advertiserChanges.baselineKind, "previousPublished");
+  assert.equal(status.advertiserChanges.baselineVersionId, "1.5:r0");
+  assert.deepEqual(status.advertiserChanges.articles.map((a) => a.id), ["04"]);
+  assert.deepEqual(status.advertiserChanges.articles[0].blocks, [
+    {before: "Ancienne clause.", after: "Nouvelle clause."},
+  ]);
+  assert.equal(Object.hasOwn(status, "adminChanges"), false);
+});
+
+test("PUBLICITAIRE : multi-revisions depuis la derniere version acceptee", async () => {
+  const f = fixture("ANNONCEUR");
+  const current = f.docs.get("legalDocuments/advertiserCgu");
+  current.version = "1.8";
+  current.revision = 3;
+  const previous = JSON.parse(JSON.stringify(current.chapters));
+  previous[0].content = "Clause ancienne A.";
+  previous[5].content = "Clause ancienne F.";
+  current.chapters[0].content = "Clause nouvelle A.";
+  current.chapters[5].content = "Clause nouvelle F.";
+  f.docs.set("legalVersions/advertiserCgu_r00000001_legacy", {
+    documentId: "advertiserCgu", version: "1.6", revision: 1,
+    chapters: previous,
+  });
+  const recordPath = "professionalLegalAcceptances/ANNONCEUR_" + f.token.uid;
+  f.docs.set(recordPath, {accepted: true, documentId: "advertiserCgu",
+    versionId: "1.6:r1"});
+  const result = await action({admin: f.admin, token: f.token,
+    input: {action: "status"}});
+  assert.equal(result.advertiserChanges.baselineKind, "lastAccepted");
+  assert.equal(result.advertiserChanges.baselineVersionId, "1.6:r1");
+  assert.deepEqual(result.advertiserChanges.articles.map((a) => a.id),
+      ["01", "06"]);
+  assert.equal(Object.hasOwn(result, "adminChanges"), false);
+});
+
+test("PUBLICITAIRE : archive absente ne provoque aucun resume fictif", async () => {
+  const f = fixture("ANNONCEUR");
+  const current = f.docs.get("legalDocuments/advertiserCgu");
+  current.version = "1.6";
+  current.revision = 0;
+  const result = await action({admin: f.admin, token: f.token,
+    input: {action: "status"}});
+  assert.equal(result.required, true);
+  assert.equal(result.advertiserChanges, null);
+  assert.equal(result.versionId, "1.6:r0");
+});
+
+test("PUBLICITAIRE : apres acceptation le panneau ne reapparait pas", async () => {
+  const f = fixture("ANNONCEUR");
+  await action({admin: f.admin, token: f.token, input: {
+    action: "accept", versionId: "1.2:r1", accepted: true,
+  }});
+  const current = await action({admin: f.admin, token: f.token,
+    input: {action: "status"}});
+  assert.equal(current.required, false);
+  assert.equal(Object.hasOwn(current, "advertiserChanges"), false);
+  assert.equal(f.docs.get("professionalLegalAcceptances/ANNONCEUR_" +
+      f.token.uid).versionId, "1.2:r1");
+});
