@@ -60,7 +60,8 @@ void main() {
       MaterialApp(
         home: AdminLegalOverlay(
           dashboard: Scaffold(
-            body: Center(
+            body: Align(
+              alignment: Alignment.bottomLeft,
               child: TextButton(
                 onPressed: () => backgroundClicks++,
                 child: const Text('CARTE ET CINQ ETAPES ADMIN'),
@@ -96,6 +97,7 @@ void main() {
     );
     await tester.pump();
     expect(backgroundClicks, 0);
+    expect(panelClicks, 0);
 
     await tester.tap(find.text('ACCEPTER LES CGU'));
     await tester.pump();
