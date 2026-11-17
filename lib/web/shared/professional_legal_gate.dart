@@ -192,6 +192,8 @@ class _PublishedProfessionalLegalGateState
   bool _submitting = false;
   bool _required = true;
   bool _acknowledged = false;
+  bool _adminShowFullDocument = false;
+  Map<String, dynamic>? _adminChanges;
   String? _error;
 
   @override
@@ -250,6 +252,11 @@ class _PublishedProfessionalLegalGateState
       }
       setState(() {
         _required = result['required'] == true;
+        _adminChanges = widget.documentId == 'adminCgu' &&
+                result['adminChanges'] is Map
+            ? Map<String, dynamic>.from(result['adminChanges'] as Map)
+            : null;
+        _adminShowFullDocument = false;
         _loading = false;
       });
     } catch (error) {
@@ -293,159 +300,208 @@ class _PublishedProfessionalLegalGateState
     }
   }
 
+
+  List<Map<String, dynamic>> get _adminModifiedArticles {
+    final rows = _adminChanges?['articles'];
+    if (rows is! List) return <Map<String, dynamic>>[];
+    return rows.whereType<Map>()
+        .map((row) => Map<String, dynamic>.from(row)).toList();
+  }
+
+  Widget _adminChangedArticle(Map<String, dynamic> article) {
+    const blue = Color(0xFF213F8E);
+    const purple = Color(0xFF6544A8);
+    final id = (article['id'] ?? '').toString();
+    final title = (article['title'] ?? '').toString();
+    final blocks = (article['blocks'] is List)
+        ? (article['blocks'] as List).whereType<Map>()
+            .map((row) => Map<String, dynamic>.from(row)).toList()
+        : <Map<String, dynamic>>[];
+    return Card(
+      margin: const EdgeInsets.only(bottom: 9),
+      color: const Color(0xFFF7F8FC),
+      child: ExpansionTile(
+        initiallyExpanded: _adminModifiedArticles.length <= 3,
+        title: Text('Article $id — $title',
+          style: const TextStyle(color: blue, fontSize: 13,
+            fontWeight: FontWeight.w800)),
+        childrenPadding: const EdgeInsets.fromLTRB(15, 0, 15, 12),
+        children: [
+          if (article['titleChanged'] == true) ...[
+            const Text('TITRE MODIFIÉ', style: TextStyle(
+              color: purple, fontWeight: FontWeight.bold)),
+            Text('Ancien titre : ${article['beforeTitle'] ?? ''}'),
+          ],
+          if (article['orderChanged'] == true)
+            const Text('Ordre des articles modifié.'),
+          ...blocks.map((block) {
+            final before = (block['before'] ?? '').toString();
+            final after = (block['after'] ?? '').toString();
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(after.isEmpty ? 'PASSAGE SUPPRIMÉ'
+                      : before.isEmpty ? 'PASSAGE AJOUTÉ'
+                      : 'NOUVELLE FORMULATION',
+                    style: const TextStyle(fontSize: 11,
+                      fontWeight: FontWeight.w900, color: purple)),
+                  const SizedBox(height: 6),
+                  if (after.isNotEmpty)
+                    SphotLegalArticleMarkdown(markdown: after)
+                  else
+                    const Text('Ce passage a été retiré des CGU.'),
+                  if (before.isNotEmpty)
+                    ExpansionTile(
+                      tilePadding: EdgeInsets.zero,
+                      title: const Text('Consulter l’ancienne rédaction',
+                        style: TextStyle(color: blue, fontSize: 12)),
+                      children: [
+                        Align(alignment: Alignment.centerLeft,
+                          child: SphotLegalArticleMarkdown(markdown: before)),
+                      ],
+                    ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
   Widget _adminAcceptancePanel() {
-    const brandBlue = Color(0xFF213F8E);
-    const brandPurple = Color(0xFF6544A8);
+    const blue = Color(0xFF213F8E);
+    const purple = Color(0xFF6544A8);
+    final changes = _adminModifiedArticles;
+    final targeted = changes.isNotEmpty;
+    final oldVersion = (_adminChanges?['baselineVersionId'] ?? '').toString();
+    final acceptedBaseline =
+        _adminChanges?['baselineKind'] == 'lastAccepted';
+    final full = _adminShowFullDocument || !targeted;
 
     return Column(
       children: [
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 18),
+          padding: const EdgeInsets.fromLTRB(17, 14, 17, 13),
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFF18356F), Color(0xFF3154A1)],
-            ),
-          ),
+              colors: [Color(0xFF18356F), Color(0xFF3154A1)])),
           child: Row(
             children: [
-              const Icon(
-                Icons.verified_user_outlined,
-                color: Colors.white,
-                size: 32,
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'CONDITIONS GÉNÉRALES D’UTILISATION',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'SPHOT ADMIN · Version publiée ${widget.versionId}',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFFE1E9FF),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              const Icon(Icons.verified_user_outlined,
+                color: Colors.white, size: 26),
+              const SizedBox(width: 10),
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('MODIFICATIONS DES CGU SPHOT ADMIN',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900,
+                      color: Colors.white)),
+                  const SizedBox(height: 3),
+                  Text('Version publiée ${widget.versionId}',
+                    style: const TextStyle(fontSize: 12,
+                      fontWeight: FontWeight.w700, color: Color(0xFFE1E9FF))),
+                ],
+              )),
             ],
           ),
         ),
         Expanded(
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 20),
+            padding: const EdgeInsets.fromLTRB(15, 12, 15, 14),
             children: [
-              const Text(
-                'Les CGU SPHOT ADMIN ont été mises à jour. '
-                'Consultez les 14 articles puis confirmez votre accord '
-                'pour accéder au dashboard. La carte reste visible, '
-                'mais ses commandes sont verrouillées.',
-                style: TextStyle(
-                  fontSize: 13,
-                  height: 1.4,
-                  color: brandBlue,
+              if (targeted) ...[
+                Text('${changes.length} article(s) modifié(s)',
+                  style: const TextStyle(fontSize: 13,
+                    fontWeight: FontWeight.w800, color: blue)),
+                const SizedBox(height: 8),
+                Text(acceptedBaseline
+                    ? 'Comparaison avec la version précédemment acceptée '
+                      '($oldVersion). Seuls les passages modifiés sont affichés.'
+                    : 'Modifications de la dernière publication, comparées '
+                      'à la version $oldVersion. L’ancienne acceptation '
+                      'de ce compte n’est pas identifiable dans ce registre.',
+                  style: const TextStyle(fontSize: 12, height: 1.35,
+                    color: blue)),
+                const SizedBox(height: 12),
+                ...changes.map(_adminChangedArticle),
+                TextButton.icon(
+                  onPressed: () => setState(() =>
+                    _adminShowFullDocument = !_adminShowFullDocument),
+                  icon: Icon(_adminShowFullDocument
+                      ? Icons.expand_less : Icons.menu_book_outlined),
+                  label: Text(_adminShowFullDocument
+                      ? 'MASQUER LES CGU COMPLÈTES'
+                      : 'CONSULTER LES ${widget.chapters.length} ARTICLES '
+                        'DES CGU COMPLÈTES'),
                 ),
-              ),
-              const SizedBox(height: 14),
-              ...widget.chapters.map((chapter) => Card(
-                margin: const EdgeInsets.only(bottom: 7),
-                color: const Color(0xFFF6F7FB),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  side: const BorderSide(color: Color(0xFFD6DEED)),
-                ),
-                child: ExpansionTile(
-                  title: Text(
-                    (chapter['title'] ?? '').toString(),
-                    style: const TextStyle(
-                      color: brandBlue,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
+              ] else ...[
+                const Text('Comparaison historique indisponible ou '
+                    'sans différence textuelle : consultez les CGU '
+                    'complètes avant de les accepter.',
+                  style: TextStyle(fontSize: 13, color: blue)),
+                const SizedBox(height: 12),
+              ],
+              if (full)
+                ...widget.chapters.map((chapter) => Card(
+                  margin: const EdgeInsets.only(bottom: 7),
+                  color: const Color(0xFFF6F7FB),
+                  child: ExpansionTile(
+                    title: Text((chapter['title'] ?? '').toString(),
+                      style: const TextStyle(color: blue,
+                        fontSize: 13, fontWeight: FontWeight.w700)),
+                    childrenPadding: const EdgeInsets.fromLTRB(15, 0, 15, 15),
+                    children: [
+                      SphotLegalArticleMarkdown(
+                        markdown: (chapter['content'] ?? '').toString()),
+                    ],
                   ),
-                  childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  children: [
-                    SphotLegalArticleMarkdown(
-                      markdown: (chapter['content'] ?? '').toString(),
-                    ),
-                  ],
-                ),
-              )),
+                )),
             ],
           ),
         ),
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(18, 8, 18, 15),
+          padding: const EdgeInsets.fromLTRB(14, 4, 14, 9),
           decoration: const BoxDecoration(
             color: Color(0xFFF5F7FB),
-            border: Border(
-              top: BorderSide(color: Color(0xFFD8DFEB)),
-            ),
-          ),
+            border: Border(top: BorderSide(color: Color(0xFFD8DFEB)))),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
                 dense: true,
+                contentPadding: EdgeInsets.zero,
                 controlAffinity: ListTileControlAffinity.leading,
-                activeColor: brandPurple,
+                activeColor: purple,
                 value: _acknowledged,
-                onChanged: _submitting
-                    ? null
-                    : (checked) => setState(
-                          () => _acknowledged = checked ?? false,
-                        ),
-                title: Text(
-                  'J’ai lu et j’accepte les CGU SPHOT ADMIN, '
-                  'version ${widget.versionId}.',
-                  style: const TextStyle(
-                    color: brandBlue,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                onChanged: _submitting ? null : (value) =>
+                  setState(() => _acknowledged = value ?? false),
+                title: Text('J’ai pris connaissance des modifications et '
+                    'j’accepte l’intégralité des CGU SPHOT ADMIN, '
+                    'version ${widget.versionId}.',
+                  style: const TextStyle(color: blue, fontSize: 12,
+                    fontWeight: FontWeight.w600)),
               ),
               Wrap(
                 alignment: WrapAlignment.end,
-                runSpacing: 8,
-                spacing: 12,
+                spacing: 10,
+                runSpacing: 6,
                 children: [
                   TextButton.icon(
-                    onPressed: _submitting
-                        ? null
-                        : () => _leaveAdminLegalGate(context),
-                    icon: const Icon(Icons.logout_outlined, size: 18),
-                    label: const Text('SE DÉCONNECTER'),
-                  ),
+                    onPressed: _submitting ? null :
+                      () => _leaveAdminLegalGate(context),
+                    icon: const Icon(Icons.logout_outlined, size: 17),
+                    label: const Text('SE DÉCONNECTER')),
                   FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: brandPurple,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
-                      ),
-                    ),
+                    style: FilledButton.styleFrom(backgroundColor: purple),
                     onPressed: !_acknowledged || _submitting ? null : _accept,
-                    icon: const Icon(Icons.check_circle_outline, size: 18),
-                    label: Text(
-                      _submitting
-                          ? 'ENREGISTREMENT…'
-                          : 'ACCEPTER ET CONTINUER',
-                    ),
-                  ),
+                    icon: const Icon(Icons.check_circle_outline, size: 17),
+                    label: Text(_submitting
+                        ? 'ENREGISTREMENT…' : 'ACCEPTER ET CONTINUER')),
                 ],
               ),
             ],
