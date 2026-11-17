@@ -7,6 +7,8 @@ on:
       - "functions/index.js"
       - "functions/sauveteur_stats_support.js"
       - "functions/test/sauveteur_stats_bilans.test.js"
+      - "tools/sphot_stats_safe_merge.js"
+      - "docs/SPHOT-SAUVETEUR-STATS-BASE-2026-11-17.md"
       - "test/sauveteur_stats_display_test.dart"
       - ".github/workflows/sauveteur-stats-validation.yml"
   workflow_dispatch:
@@ -33,6 +35,7 @@ jobs:
           node --check functions/index.js
           node --check functions/sauveteur_stats_support.js
           node --check functions/test/sauveteur_stats_bilans.test.js
+          node --check tools/sphot_stats_safe_merge.js
       - name: Tester les statistiques et le cycle de vie
         run: |
           node --test \
