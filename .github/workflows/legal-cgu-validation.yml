@@ -11,6 +11,7 @@ on:
       - "functions/**"
       - "lib/map/profil_login_page.dart"
       - "lib/web/shared/professional_legal_gate.dart"
+      - "lib/web/shared/admin_legal_overlay.dart"
       - "lib/web/admin/pages/admin_dashboard_page.dart"
       - "lib/web/advertiser/pages/advertiser_dashboard_page.dart"
       - "lib/pages/sauveteur/sauveteur_legal_acceptance_page.dart"
@@ -105,6 +106,7 @@ jobs:
             lib/services/legal_published_version.dart \
             lib/map/profil_login_page.dart \
             lib/web/shared/professional_legal_gate.dart \
+            lib/web/shared/admin_legal_overlay.dart \
             lib/web/admin/pages/admin_dashboard_page.dart \
             lib/web/advertiser/pages/advertiser_dashboard_page.dart \
             lib/pages/sauveteur/sauveteur_legal_acceptance_page.dart \

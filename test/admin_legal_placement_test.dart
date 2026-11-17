@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:bathing_spots_app/web/shared/admin_legal_overlay.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -32,6 +34,74 @@ void main() {
     );
     expect(advertiser.contains('if (!widget.approvedAccess) return dashboard;'),
         isTrue);
+  });
+
+  test('Le panneau CGU ADMIN conserve les 14 articles et le consentement', () {
+    final gate = File('lib/web/shared/professional_legal_gate.dart')
+        .readAsStringSync();
+    expect(gate.contains("if (widget.documentId == 'adminCgu')"), isTrue);
+    expect(gate.contains('AdminLegalOverlay('), isTrue);
+    expect(gate.contains('...widget.chapters.map((chapter)'), isTrue);
+    expect(gate.contains('SphotLegalArticleMarkdown('), isTrue);
+    expect(gate.contains("'action': 'accept'"), isTrue);
+    expect(gate.contains("'versionId': widget.versionId"), isTrue);
+    expect(gate.contains('_required = false;'), isTrue);
+    // La branche annonceur et son affichage historique restent inchangés.
+    expect(gate.contains("backgroundColor: const Color(0xFFF3F6FA)"),
+        isTrue);
+  });
+
+  testWidgets('La carte et les cinq étapes Admin restent visibles '
+      'mais non interactives avant acceptation', (tester) async {
+    var backgroundClicks = 0;
+    var panelClicks = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AdminLegalOverlay(
+          dashboard: Scaffold(
+            body: Align(
+              alignment: Alignment.bottomLeft,
+              child: TextButton(
+                onPressed: () => backgroundClicks++,
+                child: const Text('CARTE ET CINQ ETAPES ADMIN'),
+              ),
+            ),
+          ),
+          fullHeight: false,
+          panel: Center(
+            child: FilledButton(
+              onPressed: () => panelClicks++,
+              child: const Text('ACCEPTER LES CGU'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('CARTE ET CINQ ETAPES ADMIN'), findsOneWidget);
+    expect(find.text('ACCEPTER LES CGU'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(AdminLegalOverlay),
+        matching: find.byType(ModalBarrier),
+      ),
+      findsOneWidget,
+    );
+    expect(find.byType(ExcludeFocus), findsOneWidget);
+    expect(find.byType(PopScope), findsOneWidget);
+
+    await tester.tap(
+      find.text('CARTE ET CINQ ETAPES ADMIN'),
+      warnIfMissed: false,
+    );
+    await tester.pump();
+    expect(backgroundClicks, 0);
+    expect(panelClicks, 0);
+
+    await tester.tap(find.text('ACCEPTER LES CGU'));
+    await tester.pump();
+    expect(panelClicks, 1);
   });
 
   test('La demande d’accès garde les CGU ADMIN versionnées', () {
