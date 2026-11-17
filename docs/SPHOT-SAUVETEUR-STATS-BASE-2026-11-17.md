@@ -89,10 +89,17 @@ git diff --check
 git diff -- functions/index.js
 ```
 
-Le script effectue un merge Git à trois versions. Il préserve une sauvegarde
-dans le répertoire temporaire du système et refuse d'écraser un fichier
-auxiliaire déjà différent. S'il signale un conflit, **ne pas forcer** le
-déploiement : transmettre le message et faire une résolution localisée.
+Le script tente d'abord un merge Git à trois versions. Si ce merge
+signale des conflits (notamment avec le travail local Odoo/Admin), il utilise
+une **fusion ciblée** de l'import, de la seule fonction getSauveteurStats et
+des deux insertions d'identifiant dans updateSauveteurLiveState.
+Avant toute écriture, il vérifie que ce calcul reproduit EXACTEMENT
+le commit STATS cible depuis le commit initial. Si l'une de ces zones STATS
+a elle-même été modifiée localement, il refuse la fusion : aucune écriture.
+Il conserve une sauvegarde dans le répertoire temporaire du système et
+refuse d'écraser un fichier auxiliaire déjà différent. En cas de refus,
+**ne pas forcer** le déploiement : examiner le message et réaliser une
+résolution localisée.
 
 **Contrôle avant déploiement :** vérifier le projet Firebase sélectionné,
 le statut du merge et les tests, puis effectuer un déploiement strictement
