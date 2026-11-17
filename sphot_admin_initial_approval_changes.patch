@@ -1,0 +1,371 @@
+diff --git a/functions/index.js b/functions/index.js
+index 7f762c3..93efb14 100644
+--- a/functions/index.js
++++ b/functions/index.js
+@@ -48,6 +48,13 @@ if (process.env.SPHOT_ENABLE_ADMIN_QUOTE_PORTAL === "true") {
+       registerAdminQuotePortalEndpoint({admin, onRequest});
+ }
+ 
++// Approbation initiale unifiée : opt-in au déploiement, après contrôle des
++// règles Firestore. Aucun droit commercial, paiement ou essai déclenché ici.
++if (process.env.SPHOT_ENABLE_ADMIN_INITIAL_APPROVAL === "true") {
++  exports.approveAdminInitialRequest =
++      require("./admin_initial_approval").endpoint({admin, onRequest});
++}
++
+ // Expiration vérifiée côté serveur ; préparation seulement, sans activation
+ // ni modification du rayon contractuel tant que le paiement est indisponible.
+ exports.advertiserRenewalEligibility =
+
+diff --git a/lib/web/super_admin/pages/super_admin_admin_requests_page.dart b/lib/web/super_admin/pages/super_admin_admin_requests_page.dart
+index be84f09..7784772 100644
+--- a/lib/web/super_admin/pages/super_admin_admin_requests_page.dart
++++ b/lib/web/super_admin/pages/super_admin_admin_requests_page.dart
+@@ -1,5 +1,6 @@
+ import 'package:cloud_firestore/cloud_firestore.dart';
+ import 'package:flutter/material.dart';
++import '../services/super_admin_initial_approval_service.dart';
+ 
+ class SuperAdminAdminRequestsPage extends StatefulWidget {
+   const SuperAdminAdminRequestsPage({super.key});
+@@ -22,231 +23,11 @@ class _SuperAdminAdminRequestsPageState
+   String _search = '';
+ 
+   Future<void> _approveRequest(
+-  BuildContext context,
+-  QueryDocumentSnapshot<Map<String, dynamic>> doc,
+-) async {
+-  final data = doc.data();
+-
+-  final proConnect =
+-      Map<String, dynamic>.from(data['proConnect'] ?? {});
+-
+-  final profile =
+-      Map<String, dynamic>.from(data['profile'] ?? {});
+-
+-  final structure =
+-      Map<String, dynamic>.from(data['structure'] ?? {});
+-
+-  final territoire =
+-      Map<String, dynamic>.from(data['territoire'] ?? {});
+-
+-  final institutionnelsRaw =
+-      data['institutionnels'] ?? territoire['institutionnels'];
+-  final institutionnels = institutionnelsRaw is List
+-      ? institutionnelsRaw
+-          .whereType<Map>()
+-          .map((value) => Map<String, dynamic>.from(value))
+-          .toList()
+-      : <Map<String, dynamic>>[];
+-
+-  final facturation =
+-      Map<String, dynamic>.from(data['facturation'] ?? {});
+-
+-  final subscriptionPreview =
+-      Map<String, dynamic>.from(data['subscriptionPreview'] ?? {});
+-
+-  final uid = (data['uid'] ?? doc.id).toString();
+-
+-  final email = (
+-    profile['email'] ??
+-    proConnect['email'] ??
+-    ''
+-  ).toString().trim();
+-
+-  final batch = FirebaseFirestore.instance.batch();
+-
+-  final adminRef =
+-      FirebaseFirestore.instance.collection('admins').doc(uid);
+-
+-  final requestRef = FirebaseFirestore.instance
+-      .collection('adminRequests')
+-      .doc(doc.id);
+-
+-  final subscriptionRef = FirebaseFirestore.instance
+-      .collection('subscriptions')
+-      .doc(uid);
+-
+-  final territoireId = (territoire['territoireId'] ?? '').toString().trim();
+-  final territoireRef = territoireId.isEmpty
+-      ? null
+-      : FirebaseFirestore.instance.collection('territoires').doc(territoireId);
+-
+-  batch.set(
+-    adminRef,
+-    {
+-      'uid': uid,
+-      'email': email,
+-      'organisation':
+-          structure['nom'] ?? proConnect['organisation'] ?? '',
+-      'siret':
+-          structure['siret'] ??
+-          proConnect['siret'] ??
+-          facturation['billingSiret'] ??
+-          '',
+-      'siren':
+-          structure['siren'] ??
+-          proConnect['siren'] ??
+-          '',
+-      'territoireId': territoire['territoireId'] ?? '',
+-      'pays': territoire['pays'] ?? '',
+-      'region': territoire['region'] ?? '',
+-      'departement': territoire['departement'] ?? '',
+-      'ville': territoire['ville'] ?? '',
+-      'institutionnels': institutionnels,
+-      'role': 'admin',
+-      'accessStatus': 'approved',
+-      'configurationAccessGranted': true,
+-      'configurationAccessOpenedAt':
+-          FieldValue.serverTimestamp(),
+-      'updatedAt': FieldValue.serverTimestamp(),
+-      'createdAt': FieldValue.serverTimestamp(),
+-    },
+-    SetOptions(merge: true),
+-  );
+-
+-  if (territoireRef != null) {
+-    batch.set(
+-      territoireRef,
+-      {
+-        ...territoire,
+-        'institutionnels': institutionnels,
+-        'updatedAt': FieldValue.serverTimestamp(),
+-      },
+-      SetOptions(merge: true),
+-    );
++    BuildContext context,
++    QueryDocumentSnapshot<Map<String, dynamic>> doc,
++  ) async {
++    await SuperAdminInitialApprovalService.approve(context, doc.id);
+   }
+-
+-  batch.set(
+-    subscriptionRef,
+-    {
+-      'organisationId': uid,
+-      'adminUid': uid,
+-
+-      'billingOrganisation':
+-          facturation['billingOrganisation'] ??
+-          structure['nom'] ??
+-          '',
+-
+-      'billingSiret':
+-          facturation['billingSiret'] ??
+-          structure['siret'] ??
+-          proConnect['siret'] ??
+-          '',
+-
+-      'billingAddress':
+-          facturation['billingAddress'] ?? '',
+-
+-      'billingPostalCode':
+-          facturation['billingPostalCode'] ?? '',
+-
+-      'billingCity':
+-          facturation['billingCity'] ??
+-          territoire['ville'] ??
+-          '',
+-
+-      'billingContactName':
+-          facturation['billingContactName'] ?? '',
+-
+-      'billingContactEmail':
+-          facturation['billingContactEmail'] ?? email,
+-
+-      'purchaseOrderNumber':
+-          facturation['purchaseOrderNumber'] ?? '',
+-
+-      'engagementNumber':
+-          facturation['engagementNumber'] ?? '',
+-
+-      'chorusServiceCode':
+-          facturation['chorusServiceCode'] ?? '',
+-
+-      'numberOfRescueStations': 0,
+-
+-      'trialDurationDays':
+-          subscriptionPreview['trialDurationDays'] ?? 8,
+-
+-      'billingCycle':
+-          subscriptionPreview['billingCycle'] ?? 'annual',
+-
+-      // L’essai ne commence pas à l’approbation.
+-      'status': 'awaiting_configuration',
+-      'trialStartDate': null,
+-      'trialEndDate': null,
+-      'trialReadyAt': null,
+-
+-      'subscriptionStartDate': null,
+-      'subscriptionEndDate': null,
+-      'lastPaymentDate': null,
+-      'nextInvoiceDate': null,
+-
+-      'country': territoire['pays'] ?? '',
+-      'region': territoire['region'] ?? '',
+-      'department': territoire['departement'] ?? '',
+-      'city': territoire['ville'] ?? '',
+-
+-      'updatedAt': FieldValue.serverTimestamp(),
+-      'createdAt': FieldValue.serverTimestamp(),
+-    },
+-    SetOptions(merge: true),
+-  );
+-
+-  batch.set(
+-    requestRef,
+-    {
+-      'status': 'approved',
+-      'accessPhase': 'configuration_access',
+-      'approvedAt': FieldValue.serverTimestamp(),
+-      'updatedAt': FieldValue.serverTimestamp(),
+-
+-      'administrativeTracking.status': 'approved',
+-      'administrativeTracking.approvedAt':
+-          FieldValue.serverTimestamp(),
+-
+-      'commercialTracking.status':
+-          'configuration_access_opened',
+-
+-      'commercialTracking.configurationAccessOpenedAt':
+-          FieldValue.serverTimestamp(),
+-
+-      'setupProgress.accessGranted': true,
+-      'setupProgress.updatedAt':
+-          FieldValue.serverTimestamp(),
+-
+-      // La Cloud Function enverra le mail.
+-      'approvalEmail': {
+-        'status': 'pending',
+-        'recipient': email,
+-        'sentAt': null,
+-        'messageId': null,
+-        'error': null,
+-        'updatedAt': FieldValue.serverTimestamp(),
+-      },
+-
+-      'lastEvent': {
+-        'type': 'admin_request_approved',
+-        'category': 'administrative',
+-        'label': 'Demande administrateur approuvée',
+-        'createdAt': FieldValue.serverTimestamp(),
+-        'createdByRole': 'super_admin',
+-      },
+-    },
+-    SetOptions(merge: true),
+-  );
+-
+-  await batch.commit();
+-
+-  if (!context.mounted) return;
+-
+-}
+-
+   Future<void> _rejectRequest(
+     BuildContext context,
+     QueryDocumentSnapshot<Map<String, dynamic>> doc,
+@@ -921,4 +702,4 @@ const Text(
+       },
+     );
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/lib/web/super_admin/pages/super_admin_dashboard_page.dart b/lib/web/super_admin/pages/super_admin_dashboard_page.dart
+index ead2b09..eb31275 100644
+--- a/lib/web/super_admin/pages/super_admin_dashboard_page.dart
++++ b/lib/web/super_admin/pages/super_admin_dashboard_page.dart
+@@ -19,6 +19,7 @@ import 'dart:convert';
+ import 'package:http/http.dart' as http;
+ 
+ import '../widgets/super_admin_admin_workflow_panel.dart';
++import '../services/super_admin_initial_approval_service.dart';
+ import '../widgets/super_admin_annual_financial_export_card.dart';
+ import '../widgets/sphot_dropdown_visuals.dart';
+ import '../widgets/super_admin_advertiser_cgv_editor.dart';
+@@ -5018,78 +5019,19 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
+ 
+   Future<void> _approveAdminRequest(Map<String, dynamic> adminData) async {
+     final requestId = _cleanText(adminData['requestId'] ?? adminData['uid']);
+-
+     if (requestId.isEmpty) {
+-      throw Exception('Identifiant de la demande introuvable.');
++      throw StateError('Identifiant de la demande introuvable.');
+     }
+-
+-    final profile = Map<String, dynamic>.from(adminData['profile'] ?? {});
+-
+-    final proConnect = Map<String, dynamic>.from(adminData['proConnect'] ?? {});
+-
+-    final recipientEmail = _cleanText(
+-      profile['email'] ?? proConnect['email'] ?? adminData['email'],
++    final approved = await SuperAdminInitialApprovalService.approve(
++      context,
++      requestId,
+     );
+-
+-    if (recipientEmail.isEmpty) {
+-      throw Exception('Adresse email du demandeur introuvable.');
+-    }
+-
+-    final now = FieldValue.serverTimestamp();
+-
+-    await FirebaseFirestore.instance
+-        .collection('adminRequests')
+-        .doc(requestId)
+-        .set({
+-          'status': 'approved',
+-          'accessPhase': 'configuration_access',
+-          'updatedAt': now,
+-
+-          'administrativeTracking': {
+-            'status': 'approved',
+-            'reviewStartedAt': now,
+-            'approvedAt': now,
+-            'rejectedAt': null,
+-            'rejectionReason': null,
+-          },
+-
+-          'commercialTracking': {
+-            'status': 'configuration_access_opened',
+-            'configurationAccessOpenedAt': now,
+-          },
+-
+-          'setupProgress': {'accessGranted': true, 'updatedAt': now},
+-
+-          'approvalEmail': {
+-            'status': 'pending',
+-            'recipient': recipientEmail,
+-            'sentAt': null,
+-            'messageId': null,
+-            'error': null,
+-            'updatedAt': now,
+-          },
+-
+-          'lastEvent': {
+-            'type': 'admin_request_approved',
+-            'category': 'administrative',
+-            'label': 'Demande administrateur approuvée',
+-            'createdAt': now,
+-            'createdByRole': 'super_admin',
+-          },
+-        }, SetOptions(merge: true));
+-
+-    if (!mounted) return;
+-
++    if (!approved || !mounted) return;
+     setState(() {
+-      _selectedAdmin = {
+-        ...adminData,
+-        'status': 'approved',
+-        'accessPhase': 'configuration_access',
+-        'approvalEmail': {'status': 'pending', 'recipient': recipientEmail},
+-      };
++      _selectedAdmin = {...adminData, 'status': 'approved',
++        'accessPhase': 'configuration_access'};
+     });
+   }
+-
+   Future<void> _rejectAdminRequest(
+     Map<String, dynamic> adminData,
+     String rejectionReason,

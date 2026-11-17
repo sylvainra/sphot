@@ -1,0 +1,180 @@
+--- a/lib/web/admin/pages/admin_subscription_panel.dart
++++ b/lib/web/admin/pages/admin_subscription_panel.dart
+@@ -33,6 +33,8 @@
+   final Set<String> _expandedSections = <String>{};
+ 
+   String? _savingSection;
++  String? _offerPreflightNotice;
++  bool _offerPreflightOk = false;
+   bool _preparingQuotePdf = false;
+   bool? _draftNoOrderRequired;
+   String? _draftPaymentMethod;
+@@ -459,7 +461,11 @@
+     if (section == 'offer') {
+       if (!mounted) return;
+       if (AdminOdooLocalPreflightService.configured) {
+-        setState(() => _savingSection = section);
++        setState(() {
++          _savingSection = section;
++          _offerPreflightNotice = null;
++          _offerPreflightOk = false;
++        });
+         try {
+           final rawIds = fields['selectedRescueStationIds'];
+           final ids = rawIds is List
+@@ -470,33 +476,30 @@
+           if (!mounted) return;
+           final amount = (result['payableExclTaxCents'] as int) / 100;
+           final reference = result['pricingReference']?.toString() ?? '';
+-          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+-            SnackBar(
+-              content: Text(
++          setState(() {
++            _offerPreflightOk = true;
++            _offerPreflightNotice =
+                 'Précontrôle Odoo TEST : ${ids.length} poste(s), '
+                 '$reference, ${amount.toStringAsFixed(2)} € HT. '
+-                'Aucune commande, facture ou activation créée.',
+-              ),
+-            ),
+-          );
++                'Aucune commande, facture ou activation créée.';
++          });
+         } catch (error) {
+           if (!mounted) return;
+-          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+-            SnackBar(content: Text('Précontrôle ADMIN refusé : $error')),
+-          );
++          setState(() {
++            _offerPreflightOk = false;
++            _offerPreflightNotice = 'Précontrôle ADMIN refusé : $error';
++          });
+         } finally {
+           if (mounted) setState(() => _savingSection = null);
+         }
+         return;
+       }
+-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+-        const SnackBar(
+-          content: Text(
++      setState(() {
++        _offerPreflightOk = false;
++        _offerPreflightNotice =
+             'Devis consultable, mais enregistrement commercial en attente '
+-            'de validation serveur Odoo. Aucune sélection facturable enregistrée.',
+-          ),
+-        ),
+-      );
++            'de validation serveur Odoo. Aucune sélection facturable enregistrée.';
++      });
+       return;
+     }
+ 
+@@ -1069,31 +1072,38 @@
+                               : _blue.withOpacity(0.18),
+                         ),
+                       ),
+-                      child: CheckboxListTile(
+-                        value: checked,
+-                        activeColor: _red,
+-                        controlAffinity: ListTileControlAffinity.leading,
+-                        contentPadding: const EdgeInsets.symmetric(
+-                          horizontal: 8,
+-                          vertical: 1,
+-                        ),
+-                        title: Text(
+-                          _spotDisplayName(document.id, document.data()),
+-                          style: const TextStyle(
+-                            color: _blue,
+-                            fontSize: 12,
+-                            fontWeight: FontWeight.w800,
++                      // Le fond est peint par le Container : placer une
++                      // surface Material au-dessus rend l'encre visible.
++                      child: Material(
++                        color: Colors.transparent,
++                        child: CheckboxListTile(
++                          value: checked,
++                          activeColor: _red,
++                          controlAffinity: ListTileControlAffinity.leading,
++                          contentPadding: const EdgeInsets.symmetric(
++                            horizontal: 8,
++                            vertical: 1,
+                           ),
++                          title: Text(
++                            _spotDisplayName(document.id, document.data()),
++                            style: const TextStyle(
++                              color: _blue,
++                              fontSize: 12,
++                              fontWeight: FontWeight.w800,
++                            ),
++                          ),
++                          onChanged: (value) {
++                            setState(() {
++                              _offerPreflightNotice = null;
++                              _offerPreflightOk = false;
++                              if (value == true) {
++                                _selectedRescueStationIds.add(document.id);
++                              } else {
++                                _selectedRescueStationIds.remove(document.id);
++                              }
++                            });
++                          },
+                         ),
+-                        onChanged: (value) {
+-                          setState(() {
+-                            if (value == true) {
+-                              _selectedRescueStationIds.add(document.id);
+-                            } else {
+-                              _selectedRescueStationIds.remove(document.id);
+-                            }
+-                          });
+-                        },
+                       ),
+                     );
+                   }),
+@@ -1258,6 +1268,27 @@
+               style: TextStyle(color: _grey, fontSize: 11),
+             ),
+             const SizedBox(height: 12),
++            if (_offerPreflightNotice != null) ...[
++              Container(
++                padding: const EdgeInsets.all(12),
++                decoration: BoxDecoration(
++                  color: (_offerPreflightOk ? _green : _red).withOpacity(0.08),
++                  borderRadius: BorderRadius.circular(10),
++                  border: Border.all(
++                    color: (_offerPreflightOk ? _green : _red).withOpacity(0.55),
++                  ),
++                ),
++                child: Text(
++                  _offerPreflightNotice!,
++                  style: TextStyle(
++                    color: _offerPreflightOk ? _green : _red,
++                    fontSize: 12,
++                    fontWeight: FontWeight.w700,
++                  ),
++                ),
++              ),
++              const SizedBox(height: 12),
++            ],
+             if (isActiveSubscription)
+               const Text(
+                 'Abonnement actif : son montant contractuel reste inchangé. '
+--- a/functions/test/odoo_admin_live_readonly_preflight.test.js
++++ b/functions/test/odoo_admin_live_readonly_preflight.test.js
+@@ -175,3 +175,15 @@
+   assert.match(bridge, /req\.url !== "\/admin\/preflight"/);
+   assert.doesNotMatch(bridge, /\.set\(|\.update\(|\.runTransaction\(|\.delete\(/);
+ });
++
++test("ADMIN Flutter : résultat du précontrôle affiché dans le panneau sans Scaffold", () => {
++  const panel = fs.readFileSync(path.resolve(__dirname,
++      "../../lib/web/admin/pages/admin_subscription_panel.dart"), "utf8");
++  const offerHandler = panel.slice(panel.indexOf("if (section == 'offer')"),
++      panel.indexOf("setState(() {\n      _savingSection = section;", panel.indexOf("if (section == 'offer')")));
++  assert.match(offerHandler, /_offerPreflightNotice =/);
++  assert.match(panel, /if \(_offerPreflightNotice != null\)/);
++  assert.match(panel, /_offerPreflightNotice = null;\s*_offerPreflightOk = false;\s*if \(value == true\)/);
++  assert.doesNotMatch(offerHandler, /ScaffoldMessenger\.[\s\S]*?showSnackBar/);
++  assert.match(panel, /child: Material\(\s*color: Colors\.transparent,\s*child: CheckboxListTile/);
++});

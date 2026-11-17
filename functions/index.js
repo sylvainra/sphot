@@ -1,4 +1,8 @@
-const {sendSphotMail} = require("./sphot_email_design");
+const {parisCivilYear} = require("./sauveteur_main_courante_lifecycle");
+const {mainCouranteReadBounds} = require("./sauveteur_main_courante_lifecycle");
+const {searchCaseIdForNotification, seasonPeriodsForStation} =
+    require("./sauveteur_stats_support");
+const {sendSphotMail, buildSphotMessage} = require("./sphot_email_design");
 const {setGlobalOptions} = require("firebase-functions");
 const {defineString} = require("firebase-functions/params");
 const {onRequest} = require("firebase-functions/v2/https");
@@ -46,6 +50,29 @@ admin.initializeApp();
 if (process.env.SPHOT_ENABLE_ADMIN_QUOTE_PORTAL === "true") {
   exports.adminQuotePortal =
       registerAdminQuotePortalEndpoint({admin, onRequest});
+}
+
+// Acceptation CGV ADMIN phase 2 : desactivee avant audit des regles Firestore
+// protegeant odooAdminCgvAcceptanceEvidence et son historique.
+// Aucun droit commercial, commande ni paiement ne sont declenches ici.
+if (process.env.SPHOT_ENABLE_ADMIN_CGV_ACCEPTANCE === "true") {
+  exports.acceptAdminCommercialCgv =
+      require("./odoo_admin_cgv_acceptance")
+          .registerAdminCgvAcceptance({admin, onRequest});
+}
+
+// La première approbation ADMIN doit être disponible dans le vrai portail.
+// Seul un Super Admin muni d'une session Firebase valide et non expirée
+// peut créer sa preuve immuable ; aucune activation commerciale ici.
+// Déployer explicitement cette fonction avant de valider un nouveau dossier.
+exports.approveAdminInitialRequest =
+    require("./admin_initial_approval").endpoint({admin, onRequest});
+
+// Autorisation d'essai ADMIN séparée, uniquement après preuve de validation
+// initiale. Désactivée par défaut : test des règles avant tout déploiement.
+if (process.env.SPHOT_ENABLE_ADMIN_TRIAL_AUTHORIZATION === "true") {
+  exports.authorizeAdminTrial =
+      require("./admin_trial_authorization").endpoint({admin, onRequest});
 }
 
 // Expiration vérifiée côté serveur ; préparation seulement, sans activation
@@ -1866,7 +1893,6 @@ function createAdminRequestPdf({
       const grey = "#607D8B";
       const pale = "#F3F6FB";
       const paleWarm = "#FFF8E1";
-      const white = "#FFFFFF";
 
       const left = doc.page.margins.left;
       const right = doc.page.width - doc.page.margins.right;
@@ -1969,44 +1995,22 @@ function createAdminRequestPdf({
         doc.y = boxY + boxHeight + 10;
       };
 
-      doc
-          .roundedRect(left, 30, contentWidth, 72, 14)
-          .fillAndStroke(white, "#D9E2EC");
+      // Les mêmes images que le mail d'accusé de réception, sans ancien
+      // bandeau encadré ni slogan. Aucun fichier graphique parallèle.
+      const mailAssets = buildSphotMessage({text: ""}).attachments;
+      const mailLogo = mailAssets.find((asset) =>
+        asset.filename === "sphot_title.png")?.content;
+      const mailFire = mailAssets.find((asset) =>
+        asset.filename === "fire_red_icon.png")?.content;
+      if (!Buffer.isBuffer(mailLogo) || !Buffer.isBuffer(mailFire)) {
+        throw new Error("Identité visuelle SPHOT indisponible.");
+      }
+      doc.image(mailLogo, (doc.page.width - 240) / 2, 31, {
+        fit: [240, 58],
+        align: "center",
+      });
 
-      doc
-          .font("Helvetica-Bold")
-          .fontSize(25)
-          .fillColor(red)
-          .text("SPHOT", left + 18, 43, {
-            width: 120,
-          });
-
-      doc
-          .font("Helvetica")
-          .fontSize(7.2)
-          .fillColor(grey)
-          .text(
-              "Des plages plus sûres, propres et connectées",
-              left + 18,
-              73,
-              {width: 200},
-          );
-
-      doc
-          .font("Helvetica-Bold")
-          .fontSize(8)
-          .fillColor(blue)
-          .text(
-              "SURVEILLER  •  PRÉSERVER  •  INFORMER  •  ENSEMBLE",
-              left + 222,
-              56,
-              {
-                width: contentWidth - 240,
-                align: "right",
-              },
-          );
-
-      doc.y = 116;
+      doc.y = 105;
 
       doc
           .font("Helvetica-Bold")
@@ -2015,6 +2019,8 @@ function createAdminRequestPdf({
           .text(
               "ACCUSÉ DE RÉCEPTION DE LA DEMANDE D'ACCÈS " +
               "ADMINISTRATEUR",
+              left,
+              doc.y,
               {
                 align: "center",
                 width: contentWidth,
@@ -2270,6 +2276,10 @@ function createAdminRequestPdf({
             width: contentWidth,
             align: "right",
           });
+
+      // Marqueur centré, identique à celui placé au bas des mails SPHOT.
+      doc.image(mailFire, (doc.page.width - 32) / 2,
+          doc.page.height - 118, {fit: [32, 49]});
 
       const footerY = doc.page.height - 54;
       doc
@@ -4322,6 +4332,10 @@ exports.updateSubscriptionStatuses = onSchedule(
       });
 
       activeSnapshot.docs.forEach((doc) => {
+        // Les retards de paiement des cycles ADMIN suivis dans Odoo donnent
+        // lieu à relances, jamais à une suspension automatique de diffusion.
+        // L'échéance annuelle reste gérée par processSubscriptionLifecycle.
+        if ((doc.data() || {}).odooAdminManaged === true) return;
         batch.set(
             doc.ref,
             {
@@ -5867,6 +5881,47 @@ exports.acceptSauveteurLegalTerms = onRequest(
           return;
         }
 
+        // Une même version 1.0 peut avoir plusieurs révisions d'articles.
+        // Vérifier côté serveur le contenu réellement lu avant d'archiver
+        // la nouvelle acceptation. Les anciens clients restent compatibles.
+        let verifiedDocumentRevisions = null;
+        if (request.body.legalDocumentRevisions != null) {
+          const expected = request.body.legalDocumentRevisions;
+          if (!expected || typeof expected !== "object" ||
+              Array.isArray(expected)) {
+            response.status(400).json({success: false,
+              error: "invalid_document_revisions"});
+            return;
+          }
+          const legalDocuments = admin.firestore().collection("legalDocuments");
+          const specific = legalDocuments.doc("sauveteurCgu");
+          const specificArticles = await specific.collection("chapters")
+              .limit(1).get();
+          const cguDocumentId = specificArticles.empty ?
+            "cgu" : "sauveteurCgu";
+          const ids = [cguDocumentId, "privacyPolicy", "rgpdNotice",
+            "sauveteurCharter"];
+          const snapshots = await Promise.all(ids.map((id) =>
+            legalDocuments.doc(id).get()));
+          verifiedDocumentRevisions = {cguDocumentId};
+          let outOfDate = expected.cguDocumentId !== cguDocumentId;
+          for (let i = 0; i < ids.length; i++) {
+            const data = snapshots[i].data() || {};
+            const revision = data.revision ?? 0;
+            verifiedDocumentRevisions[ids[i]] = revision;
+            if (!snapshots[i].exists || data.published === false ||
+                !Number.isSafeInteger(revision) ||
+                expected[ids[i]] !== revision) {
+              outOfDate = true;
+            }
+          }
+          if (outOfDate) {
+            response.status(409).json({success: false,
+              error: "legal_documents_changed"});
+            return;
+          }
+        }
+
         const requiredFlags = [
           request.body.cguAccepted === true,
           request.body.privacyAcknowledged === true,
@@ -5903,7 +5958,10 @@ exports.acceptSauveteurLegalTerms = onRequest(
             cgu: true,
             privacy: true,
             rgpd: true,
+            sauveteurCharter: true,
           },
+          ...(verifiedDocumentRevisions ?
+            {documentRevisions: verifiedDocumentRevisions} : {}),
           operationalRules: {
             publicOperationalDiffusionAcknowledged: true,
             institutionalReadAcknowledged: true,
@@ -5915,11 +5973,15 @@ exports.acceptSauveteurLegalTerms = onRequest(
           source: "sphot_sauveteur_access_validation",
         };
 
+        const documentRevisionSuffix = verifiedDocumentRevisions ?
+          "_" + crypto.createHash("sha256")
+              .update(JSON.stringify(verifiedDocumentRevisions))
+              .digest("hex").slice(0, 12) : "";
         const historyReference = accountReference
             .collection("legalAcceptances")
             .doc(
                 `${legalPack.versionId}_sauveteur_r` +
-                SAUVETEUR_LEGAL_ACCEPTANCE_REVISION,
+                SAUVETEUR_LEGAL_ACCEPTANCE_REVISION + documentRevisionSuffix,
             );
 
         const historySnapshot = await historyReference.get();
@@ -7380,6 +7442,18 @@ exports.updateSauveteurLiveState = onRequest(
         const spotReference = db.collection("spots").doc(spotId);
         const spotSnapshot = await spotReference.get();
         const previousSpot = spotSnapshot.data() || {};
+        if (automaticNotificationMainCourante) {
+          const searchCaseId = searchCaseIdForNotification(
+              previousSpot.notificationPublique,
+              () => crypto.randomUUID(),
+          );
+          automaticNotificationMainCourante.searchCaseId = searchCaseId;
+          sanitizedChanges.notificationPublique = {
+            ...sanitizedChanges.notificationPublique,
+            source: "recherche_personne",
+            searchCaseId,
+          };
+        }
         const previousLiveFlag = previousSpot.liveFlag || {};
         const auditReference = db.collection("sauveteurOperationalAudit").doc();
 
@@ -7563,6 +7637,7 @@ exports.updateSauveteurLiveState = onRequest(
               role: context.userRole,
             },
             source: "automatic_person_search_publication",
+            searchCaseId: automaticNotificationMainCourante.searchCaseId,
             publicNotificationMessage:
               automaticNotificationMainCourante.publicMessage,
             immutableOriginal: true,
@@ -11619,6 +11694,8 @@ exports.getSauveteurStats = onRequest(
         const {context} = session;
         const spotId = (request.body.spotId || "").toString().trim();
 
+        // Correspond aux droits temps réel du sauveteur sur un
+        // poste affecté, surveillé et autorisé à la diffusion.
         if (!context.realtimeSpotIds.includes(spotId)) {
           response.status(403).json({
             success: false,
@@ -11627,40 +11704,46 @@ exports.getSauveteurStats = onRequest(
           return;
         }
 
-        let entriesQuery = admin.firestore()
+        const bounds = mainCouranteReadBounds(request.body);
+        const stationReference = admin.firestore()
             .collection("territoires")
             .doc(context.territoireId)
             .collection("spots")
-            .doc(spotId)
-            .collection("mainCourante");
+            .doc(spotId);
+        const entriesQuery = stationReference
+            .collection("mainCourante")
+            .where(
+                "occurredAt", ">=",
+                admin.firestore.Timestamp.fromMillis(bounds.from),
+            )
+            .where(
+                "occurredAt", "<",
+                admin.firestore.Timestamp.fromMillis(bounds.until),
+            );
 
-        const dayStartMillis = Number(request.body.dayStartMillis);
-        const dayEndMillis = Number(request.body.dayEndMillis);
-        if (Number.isFinite(dayStartMillis) &&
-            Number.isFinite(dayEndMillis) &&
-            dayEndMillis > dayStartMillis) {
-          entriesQuery = entriesQuery
-              .where(
-                  "occurredAt",
-                  ">=",
-                  admin.firestore.Timestamp.fromMillis(dayStartMillis),
-              )
-              .where(
-                  "occurredAt",
-                  "<",
-                  admin.firestore.Timestamp.fromMillis(dayEndMillis),
-              );
+        // Le plafond historique de 500 faits tronquait les bilans mensuels.
+        // Parcours paginé de tous les faits (ordre stable par document).
+        const documents = [];
+        if (!bounds.empty) {
+          let cursor = null;
+          for (;;) {
+            let pageQuery = entriesQuery
+                .orderBy("occurredAt", "desc")
+                .limit(500);
+            if (cursor) pageQuery = pageQuery.startAfter(cursor);
+            const page = await pageQuery.get();
+            documents.push(...page.docs);
+            if (page.docs.length < 500) break;
+            cursor = page.docs[page.docs.length - 1];
+          }
         }
-
-        const snapshot = await entriesQuery
-            .orderBy("occurredAt", "desc")
-            .limit(500)
-            .get();
 
         const canSeeRestricted =
           context.canManageRestrictedOperationalData;
 
-        const entries = snapshot.docs
+        // Seules les données nécessaires aux statistiques sont transmises :
+        // jamais les identités, coordonnées ou récits des victimes.
+        const entries = documents
             .map((document) => {
               const data = document.data() || {};
               return {id: document.id, ...data};
@@ -11671,26 +11754,38 @@ exports.getSauveteurStats = onRequest(
             .map((entry) => ({
               id: entry.id,
               type: entry.type || "Observation",
-              description: entry.description || "",
-              actionTaken: entry.actionTaken || "",
-              visibility: entry.visibility || "operational",
+              description:
+                (entry.type || "").toString().trim().toLowerCase() ===
+                  "drapeau" ? entry.description || "" : "",
               victim: entry.victim && typeof entry.victim === "object" ?
-                entry.victim : null,
-              interventionZones:
-                sanitizeMainCouranteInterventionZones(
-                    entry.interventionZones,
-                ),
-              presencePersonnel:
-                sanitizeMainCourantePresencePersonnel(
-                    entry.presencePersonnel,
-                ),
-              source: entry.source || "",
-              wasEdited: entry.wasEdited === true,
+                {qualification: entry.victim.qualification || ""} : null,
+              searchCaseId: entry.searchCaseId || "",
               occurredAt: entry.occurredAt &&
-                  typeof entry.occurredAt.toMillis === "function" ?
+                typeof entry.occurredAt.toMillis === "function" ?
                 entry.occurredAt.toMillis() : null,
-              createdBy: entry.createdBy || {},
             }));
+
+        // Une saison = union des périodes affectées au poste pour l'année,
+        // y compris lorsque ces périodes sont discontinues ou se chevauchent.
+        const requestedYear = Number(request.body.statsYear);
+        const year = Number.isInteger(requestedYear) &&
+            requestedYear >= 2000 && requestedYear <= 2100 ?
+              requestedYear : parisCivilYear().year;
+        const [stationSnapshot, assignedSnapshot, periodsSnapshot] =
+          await Promise.all([
+            stationReference.get(),
+            stationReference.collection("sauveteursAffectes").get(),
+            admin.firestore().collection("territoires")
+                .doc(context.territoireId)
+                .collection("periodesSurveillance").get(),
+          ]);
+        const seasonPeriods = seasonPeriodsForStation({
+          station: stationSnapshot.data() || {},
+          assigned: assignedSnapshot.docs.map((doc) => doc.data() || {}),
+          periods: periodsSnapshot.docs.map(
+              (doc) => ({id: doc.id, ...doc.data()})),
+          year,
+        });
 
         await admin.firestore()
             .collection("mainCouranteAccessLogs")
@@ -11708,6 +11803,7 @@ exports.getSauveteurStats = onRequest(
         response.status(200).json({
           success: true,
           entries,
+          seasonPeriods,
         });
       } catch (error) {
         console.error("Erreur lecture statistiques sauveteur:", error);
@@ -12120,6 +12216,14 @@ const {registerAdvertiserPhaseTwoWrite} =
 exports.saveAdvertiserPhaseTwo = registerAdvertiserPhaseTwoWrite({
   admin, onRequest,
 });
+
+// Lecture des commandes et factures Odoo depuis SPHOT.APP uniquement.
+// Désactivée tant que l'instance Odoo HTTPS, les secrets et le parcours de
+// facturation serveur ne sont pas opérationnels. Aucune écriture Odoo ici.
+if (process.env.SPHOT_ENABLE_ODOO_BILLING_READONLY === "true") {
+  const {registerOdooBillingStatus} = require("./odoo_billing_status");
+  exports.getOdooBillingStatus = registerOdooBillingStatus({admin, onRequest});
+}
 
 // Initial advertiser order: stores an immutable TEST-only quote snapshot.
 // No Odoo API, card payment, invoice, ad activation or auto-renewal.

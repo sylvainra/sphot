@@ -1,0 +1,162 @@
+diff --git a/functions/admin_workflow.js b/functions/admin_workflow.js
+index aea3ae5..ed0203b 100644
+--- a/functions/admin_workflow.js
++++ b/functions/admin_workflow.js
+@@ -1304,42 +1304,12 @@ exports.activateApprovedAdminOrder = onDocumentUpdated(
+       const after = event.data?.after.data() || {};
+       if (cleanValue(before.status) === cleanValue(after.status)) return;
+       if (!["approved", "paid"].includes(cleanValue(after.status))) return;
+-      if (after.subscriptionActivatedAt) return;
+-
+-      const db = admin.firestore();
+-      const uid = cleanValue(after.adminUid);
+-      if (!uid) return;
+-      const start = new Date();
+-      const end = new Date(start);
+-      end.setFullYear(end.getFullYear() + 1);
+-      const batch = db.batch();
+-      batch.set(db.collection("subscriptions").doc(uid), {
+-        status: "active",
+-        subscriptionStartDate: admin.firestore.Timestamp.fromDate(start),
+-        subscriptionEndDate: admin.firestore.Timestamp.fromDate(end),
+-        billingCycle: "annual",
+-        currentOrderId: event.params.orderId,
+-        currentOrderNumber: after.orderNumber || null,
+-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+-      }, {merge: true});
+-      batch.set(db.collection("admins").doc(uid), {
+-        diffusionAccessGranted: true,
+-        diffusionAccessOpenedAt: admin.firestore.FieldValue.serverTimestamp(),
+-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+-      }, {merge: true});
+-      if (after.requestId) {
+-        batch.set(db.collection("adminRequests").doc(after.requestId), {
+-          accessPhase: "subscription_active",
+-          "commercialTracking.status": "subscription_active",
+-          "commercialTracking.subscriptionActivatedAt":
+-              admin.firestore.FieldValue.serverTimestamp(),
+-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+-        }, {merge: true});
+-      }
+-      batch.set(event.data.after.ref, {
+-        subscriptionActivatedAt: admin.firestore.FieldValue.serverTimestamp(),
+-      }, {merge: true});
+-      await batch.commit();
++      // Le statut historique d'une commande Firestore n'est pas une preuve
++      // de contrat vérifié, ni de facture Odoo, ni de paiement Stripe.
++      // Garder le trigger déployable, mais sans aucun effet commercial.
++      // L'activation est exclusivement une projection serveur Odoo vérifiée.
++      console.warn("SPHOT ADMIN: commande historique ignorée; "+
++          "activation via Odoo uniquement", event.params?.orderId);
+     },
+ );
+ 
+diff --git a/lib/web/admin/pages/admin_subscription_panel.dart b/lib/web/admin/pages/admin_subscription_panel.dart
+index e87df6d..8e73b0a 100644
+--- a/lib/web/admin/pages/admin_subscription_panel.dart
++++ b/lib/web/admin/pages/admin_subscription_panel.dart
+@@ -453,6 +453,21 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
+   ) async {
+     if (_uid.isEmpty || _savingSection != null) return;
+ 
++    // Les postes sélectionnés et le prix contractuel doivent être attestés
++    // côté serveur (tarif, territoire, Odoo), jamais enregistrés depuis Flutter.
++    if (section == 'offer') {
++      if (!mounted) return;
++      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
++        const SnackBar(
++          content: Text(
++            'Devis consultable, mais enregistrement commercial en attente '
++            'de validation serveur Odoo. Aucune sélection facturable enregistrée.',
++          ),
++        ),
++      );
++      return;
++    }
++
+     setState(() {
+       _savingSection = section;
+     });
+diff --git a/lib/web/super_admin/pages/super_admin_subscriptions_page.dart b/lib/web/super_admin/pages/super_admin_subscriptions_page.dart
+index b4e359f..c04c1d0 100644
+--- a/lib/web/super_admin/pages/super_admin_subscriptions_page.dart
++++ b/lib/web/super_admin/pages/super_admin_subscriptions_page.dart
+@@ -245,35 +245,31 @@ class _SuperAdminSubscriptionsPageState extends State<SuperAdminSubscriptionsPag
+     );
+   }
+ 
+-    Future<void> _updateSubscriptionStatus(
++  Future<void> _updateSubscriptionStatus(
+     String subscriptionId,
+     String newStatus,
+   ) async {
+-    final now = DateTime.now();
+-
+-    final data = <String, dynamic>{
+-      'status': newStatus,
+-      'updatedAt': FieldValue.serverTimestamp(),
+-    };
+-
+-    if (newStatus == 'active') {
+-      data.addAll({
+-        'subscriptionStartDate': Timestamp.fromDate(now),
+-        'subscriptionEndDate': Timestamp.fromDate(
+-          DateTime(now.year + 1, now.month, now.day),
++    // Les boutons historiques restent visibles pour la compréhension du
++    // dossier, mais aucun statut ni paiement ne peut être inventé côté UI.
++    if (!mounted) return;
++    await showDialog<void>(
++      context: context,
++      builder: (dialogContext) => AlertDialog(
++        title: const Text('MODIFICATION COMMERCIALE BLOQUÉE'),
++        content: Text(
++          'Abonnement $subscriptionId : le changement vers « $newStatus » '
++          'n’a pas été enregistré. Les statuts commerciaux SPHOT ADMIN '
++          'devront être établis par vérification serveur Odoo '
++          'et projection sécurisée Firestore.',
+         ),
+-        'lastPaymentDate': Timestamp.fromDate(now),
+-        'nextInvoiceDate': Timestamp.fromDate(now),
+-      });
+-    }
+-
+-    await FirebaseFirestore.instance
+-        .collection('subscriptions')
+-        .doc(subscriptionId)
+-        .set(
+-          data,
+-          SetOptions(merge: true),
+-        );
++        actions: [
++          TextButton(
++            onPressed: () => Navigator.of(dialogContext).pop(),
++            child: const Text('FERMER'),
++          ),
++        ],
++      ),
++    );
+   }
+ 
+   @override
+@@ -739,4 +735,4 @@ Text(
+       },
+     );
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/functions/index.js b/functions/index.js
+index 7f762c3..746d3eb 100644
+--- a/functions/index.js
++++ b/functions/index.js
+@@ -4322,6 +4336,10 @@ exports.updateSubscriptionStatuses = onSchedule(
+       });
+ 
+       activeSnapshot.docs.forEach((doc) => {
++        // Les retards de paiement des cycles ADMIN suivis dans Odoo donnent
++        // lieu à relances, jamais à une suspension automatique de diffusion.
++        // L'échéance annuelle reste gérée par processSubscriptionLifecycle.
++        if ((doc.data() || {}).odooAdminManaged === true) return;
+         batch.set(
+             doc.ref,
+             {

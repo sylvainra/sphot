@@ -14,8 +14,10 @@ const CHECKOUT_TEST_DATABASE = "sphot_publicitaire_checkout_test";
 const CHECKOUT_MODEL = "sphot.advertiser.checkout";
 const DRAFT_METHOD = "create_or_get_draft_order";
 const INVOICE_METHOD = "confirm_and_post_one_invoice";
+const STRIPE_EVIDENCE_METHOD = "read_stripe_checkout_evidence";
 const ORDER_CONTRACT = "sphot_advertiser_atomic_order_v1";
 const INVOICE_CONTRACT = "sphot_advertiser_atomic_invoice_v1";
+const STRIPE_EVIDENCE_CONTRACT = "sphot_advertiser_stripe_evidence_v1";
 
 function invalid(message) {
   const error = new Error(message);
@@ -263,10 +265,39 @@ function createSecureCheckoutClient({database = CHECKOUT_TEST_DATABASE,
     return {outcome: result.outcome, ...await status(prepared)};
   }
 
-  return {status, draft, invoice};
+  async function stripeEvidence(prepared, invoice) {
+    // The addon checks the reference, fingerprint, gateway group and invoice
+    // ownership before narrowly reading payment models with sudo().
+    if (!invoice || !Number.isSafeInteger(invoice.id) || invoice.id <= 0 ||
+        !prepared || typeof prepared.reference !== "string" ||
+        typeof prepared.fingerprint !== "string") {
+      throw invalid("Facture ou référence Stripe SPHOT invalide.");
+    }
+    const evidence = await odoo.call(CHECKOUT_MODEL, STRIPE_EVIDENCE_METHOD, {
+      sphot_reference: prepared.reference,
+      sphot_fingerprint: prepared.fingerprint,
+      invoice_id: invoice.id,
+    });
+    if (!evidence || typeof evidence !== "object" ||
+        Array.isArray(evidence) ||
+        evidence.contract !== STRIPE_EVIDENCE_CONTRACT ||
+        evidence.reference !== prepared.reference ||
+        evidence.fingerprint !== prepared.fingerprint ||
+        evidence.invoice_id !== invoice.id ||
+        !Array.isArray(evidence.stripe_providers) ||
+        !Array.isArray(evidence.demo_providers) ||
+        !Array.isArray(evidence.transactions) ||
+        evidence.transactions.length >= 20) {
+      throw invalid("Preuve Stripe Odoo restreinte non conforme.");
+    }
+    return evidence;
+  }
+
+  return {status, draft, invoice, stripeEvidence};
 }
 
 module.exports = {CHECKOUT_TEST_DATABASE, CHECKOUT_MODEL,
-  DRAFT_METHOD, INVOICE_METHOD, ORDER_CONTRACT, INVOICE_CONTRACT,
+  DRAFT_METHOD, INVOICE_METHOD, STRIPE_EVIDENCE_METHOD,
+  ORDER_CONTRACT, INVOICE_CONTRACT, STRIPE_EVIDENCE_CONTRACT,
   assertNeutralizedDatabase, trustedFingerprint, secureReferenceFor,
   prepareTrustedOrder, createSecureCheckoutClient};

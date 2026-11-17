@@ -4,7 +4,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {CHECKOUT_TEST_DATABASE, CHECKOUT_MODEL, DRAFT_METHOD,
-  INVOICE_METHOD, ORDER_CONTRACT, INVOICE_CONTRACT,
+  INVOICE_METHOD, STRIPE_EVIDENCE_METHOD, ORDER_CONTRACT, INVOICE_CONTRACT,
+  STRIPE_EVIDENCE_CONTRACT,
   trustedFingerprint, secureReferenceFor, prepareTrustedOrder,
   createSecureCheckoutClient} = require("../local/odoo_secure_checkout_client");
 
@@ -63,6 +64,17 @@ function fixture() {
           reference: prepared.reference, fingerprint: prepared.fingerprint,
           order: {...order}, invoice: {...invoice}};
       }
+      if (method === STRIPE_EVIDENCE_METHOD) {
+        assert.deepEqual(body, {sphot_reference: prepared.reference,
+          sphot_fingerprint: prepared.fingerprint, invoice_id: 11});
+        return {contract: STRIPE_EVIDENCE_CONTRACT,
+          reference: prepared.reference, fingerprint: prepared.fingerprint,
+          invoice_id: 11,
+          stripe_providers: [{id: 7, code: "stripe", is_live: false,
+            is_published: true}],
+          demo_providers: [{id: 8, code: "demo", is_published: false}],
+          transactions: []};
+      }
       throw new Error("Méthode interdite");
     }},
   });
@@ -116,6 +128,30 @@ test("après paiement : lecture seule, aucune nouvelle commande ni facture", asy
   assert.equal((await f.client.invoice(f.prepared)).outcome, "existing");
   assert.equal(f.calls.filter((call) => call.model === CHECKOUT_MODEL).length,
       writesBefore);
+});
+
+test("preuve Stripe : une seule méthode Odoo dédiée, aucun accès direct aux fournisseurs", async () => {
+  const f = fixture();
+  const evidence = await f.client.stripeEvidence(f.prepared, f.invoice);
+  assert.equal(evidence.contract, STRIPE_EVIDENCE_CONTRACT);
+  assert.deepEqual(evidence.transactions, []);
+  assert.deepEqual(f.calls.map(({model, method}) => [model, method]),
+      [[CHECKOUT_MODEL, STRIPE_EVIDENCE_METHOD]]);
+});
+
+test("preuve Stripe : refuse une facture invalide et un contrat Odoo incohérent", async () => {
+  const f = fixture();
+  await assert.rejects(f.client.stripeEvidence(f.prepared, {id: 0}),
+      /Facture ou référence/);
+  assert.equal(f.calls.length, 0);
+  const invalidClient = createSecureCheckoutClient({
+    odooClient: {call: async () => ({contract: STRIPE_EVIDENCE_CONTRACT,
+      reference: f.prepared.reference, fingerprint: f.prepared.fingerprint,
+      invoice_id: f.invoice.id + 1, stripe_providers: [],
+      demo_providers: [], transactions: []})},
+  });
+  await assert.rejects(invalidClient.stripeEvidence(f.prepared, f.invoice),
+      /Preuve Stripe Odoo restreinte non conforme/);
 });
 
 test("ligne altérée : reprise refusée sans appel d'écriture", async () => {

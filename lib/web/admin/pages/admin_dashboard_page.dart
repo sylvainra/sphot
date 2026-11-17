@@ -6596,11 +6596,31 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  Widget _buildAdminWelcomePromotion() {
+  // Permet au SPHOT ADMIN de revoir la même présentation depuis son portail,
+  // sans nouvelle inscription ni changement de l'historique de première vue.
+  Future<void> _previewAdminWelcomePromotion() async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) => Stack(
+        children: [
+          _buildAdminWelcomePromotion(
+            previewOnly: true,
+            onPreviewClose: () => Navigator.of(dialogContext).pop(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAdminWelcomePromotion({
+    bool previewOnly = false,
+    VoidCallback? onPreviewClose,
+  }) {
     // Une impression du message suffit pour le considérer comme vu.
     // On conserve son affichage pendant cette connexion, puis on le
     // masque définitivement lors des connexions suivantes.
-    if (!_welcomePromotionShownThisSession) {
+    if (!previewOnly && !_welcomePromotionShownThisSession) {
       _welcomePromotionShownThisSession = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -6635,32 +6655,40 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Row(
-                          children: [
-                            const Expanded(
-                              child: Text(
-                                'SPHOT ADMIN · VOS LIEUX DE BAIGNADE',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  color: adminColor,
-                                  fontSize: 13,
-                                  letterSpacing: 0.4,
+                        SizedBox(
+                          height: 44,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              const Center(
+                                child: Text(
+                                  'SPHOTS',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    color: adminColor,
+                                    fontSize: 18,
+                                    letterSpacing: 0.4,
+                                  ),
                                 ),
                               ),
-                            ),
-                            IconButton(
-                              tooltip: 'Fermer le message et afficher la carte',
-                              icon: const Icon(Icons.close_rounded, color: adminColor),
-                              onPressed: () {
-                                _dismissAdminWelcomePromotion();
-                              },
-                            ),
-                          ],
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: IconButton(
+                                  tooltip: 'Fermer le message et afficher la carte',
+                                  icon: const Icon(Icons.close_rounded, color: adminColor),
+                                  onPressed: onPreviewClose ?? () {
+                                    _dismissAdminWelcomePromotion();
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                         const SizedBox(height: 5),
                         const Text(
                           'Diffusez gratuitement* vos SPHOTS de baignade '
-                          'ainsi que votre structure sur l’application SPHOT.',
+                          'surveillés ou non sur l’application SPHOT.',
                           style: TextStyle(
                             fontSize: 17,
                             fontStyle: FontStyle.italic,
@@ -6675,7 +6703,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                           'vos lieux de baignade : nom, localisation, type de '
                           'site, équipements, accès, labels et informations utiles.',
                           style: TextStyle(
-                            fontSize: 13.5, color: Colors.black87, height: 1.4,
+                            fontSize: 13.5, color: adminColor, height: 1.4,
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -6692,7 +6720,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             ],
                           ),
                           style: TextStyle(
-                            fontSize: 13.5, color: Colors.black87, height: 1.4,
+                            fontSize: 13.5, color: adminColor, height: 1.4,
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -6720,7 +6748,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             ],
                           ),
                           style: TextStyle(
-                            fontSize: 13.5, color: Colors.black87, height: 1.4,
+                            fontSize: 13.5, color: adminColor, height: 1.4,
                           ),
                         ),
                         const SizedBox(height: 13),
@@ -6736,7 +6764,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                           'pendant la période d’essai autorisée ou dans le cadre '
                           'd’un abonnement en vigueur.',
                           style: TextStyle(
-                            color: Color(0xFF475569),
+                            color: adminColor,
                             fontSize: 11,
                             fontStyle: FontStyle.italic,
                             height: 1.35,
@@ -6770,19 +6798,25 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       child: SafeArea(
         child: Column(
           children: [
-            const SizedBox(
+            SizedBox(
               width: double.infinity,
-              child: Text(
-                'BIENVENUE SUR SPHOT',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: redColor,
-                  decoration: TextDecoration.none,
-                  decorationColor: Colors.transparent,
-                  fontSize: 23,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 0.6,
-                ),
+              height: 36,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  const Text(
+                    'BIENVENUE SUR SPHOT',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: redColor,
+                      decoration: TextDecoration.none,
+                      decorationColor: Colors.transparent,
+                      fontSize: 23,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                ],
               ),
             ),
 

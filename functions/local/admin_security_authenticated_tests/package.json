@@ -1,0 +1,13 @@
+{
+  "name": "sphot-admin-security-authenticated-emulator-tests",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node test.mjs"
+  },
+  "dependencies": {
+    "@firebase/rules-unit-testing": "6.0.0",
+    "firebase": "13.1.0"
+  }
+}

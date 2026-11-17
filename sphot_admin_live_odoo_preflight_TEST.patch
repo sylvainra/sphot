@@ -1,0 +1,49 @@
+diff --git a/lib/web/admin/pages/admin_subscription_panel.dart b/lib/web/admin/pages/admin_subscription_panel.dart
+--- a/lib/web/admin/pages/admin_subscription_panel.dart
++++ b/lib/web/admin/pages/admin_subscription_panel.dart
+@@ -2,6 +2,7 @@
+ import 'package:flutter/material.dart';
+ import '../../../widgets/adaptive_asset_image.dart';
+ import '../../../services/published_commercial_quote_service.dart';
++import '../services/admin_odoo_local_preflight_service.dart';
+ import 'admin_quote_consultation.dart';
+ import 'admin_quote_pdf_download.dart';
+ 
+@@ -457,6 +458,37 @@
+     // côté serveur (tarif, territoire, Odoo), jamais enregistrés depuis Flutter.
+     if (section == 'offer') {
+       if (!mounted) return;
++      if (AdminOdooLocalPreflightService.configured) {
++        setState(() => _savingSection = section);
++        try {
++          final rawIds = fields['selectedRescueStationIds'];
++          final ids = rawIds is List
++              ? rawIds.whereType<String>().toList(growable: false)
++              : <String>[];
++          final result = await const AdminOdooLocalPreflightService()
++              .verifySelection(stationIds: ids);
++          if (!mounted) return;
++          final amount = (result['payableExclTaxCents'] as int) / 100;
++          final reference = result['pricingReference']?.toString() ?? '';
++          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
++            SnackBar(
++              content: Text(
++                'Précontrôle Odoo TEST : ${ids.length} poste(s), '
++                '$reference, ${amount.toStringAsFixed(2)} € HT. '
++                'Aucune commande, facture ou activation créée.',
++              ),
++            ),
++          );
++        } catch (error) {
++          if (!mounted) return;
++          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
++            SnackBar(content: Text('Précontrôle ADMIN refusé : $error')),
++          );
++        } finally {
++          if (mounted) setState(() => _savingSection = null);
++        }
++        return;
++      }
+       ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+         const SnackBar(
+           content: Text(

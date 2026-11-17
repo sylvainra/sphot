@@ -1,0 +1,386 @@
+--- a/functions/local/start_admin_odoo_readonly.js
++++ b/functions/local/start_admin_odoo_readonly.js
+@@ -7,6 +7,7 @@
+ const http = require("node:http");
+ const {FIREBASE_PROJECT_ID, TEST_DATABASE, preflightAdminOffer} =
+   require("./odoo_admin_live_readonly_preflight");
++const {TEST_PROJECT_ID} = require("./odoo_c4_test_firestore");
+ 
+ const HOST = "127.0.0.1";
+ const PORT = 8768;
+@@ -19,7 +20,8 @@
+   res.end(JSON.stringify(body));
+ }
+ 
+-function createServer({verifyToken, db, odooClient} = {}) {
++function createServer({verifyToken, db, odooClient,
++  fixturePreflight} = {}) {
+   if (typeof verifyToken !== "function" ||
+       !db || db.projectId !== FIREBASE_PROJECT_ID ||
+       !odooClient || typeof odooClient.call !== "function") {
+@@ -44,9 +46,15 @@
+           "Authorization, Content-Type");
+       return send(res, 204, {});
+     }
+-    if (req.method !== "POST" || req.url !== "/admin/preflight") {
++    if (req.method !== "POST" || ![
++      "/admin/preflight", "/admin/fixture-preflight",
++    ].includes(req.url)) {
+       return send(res, 404, {ok: false, error: "ADMIN_PREFLIGHT_ONLY"});
+     }
++    const isFixture = req.url === "/admin/fixture-preflight";
++    if (isFixture && typeof fixturePreflight !== "function") {
++      return send(res, 404, {ok: false, error: "TEST_FIXTURE_MODE_DISABLED"});
++    }
+     const header = req.headers.authorization || "";
+     if (!header.startsWith("Bearer ") || header.length > 10000) {
+       return send(res, 401, {ok: false, error: "FIREBASE_TOKEN_REQUIRED"});
+@@ -65,11 +73,13 @@
+       } catch (_) {
+         return send(res, 400, {ok: false, error: "INVALID_JSON"});
+       }
+-      // Ne pas autoriser l'identité, le tarif, la fiscalité ou l'activation
+-      // à être fournis par le navigateur.
++      // Le mode fictif n'accepte AUCUNE donnée réelle depuis le navigateur.
++      // Le parcours réel conserve ses vérifications et son endpoint séparé.
+       if (!body || Array.isArray(body) || typeof body !== "object" ||
+-          Object.keys(body).sort().join("|") !== "stationIds") {
+-        return send(res, 400, {ok: false, error: "STATION_SELECTION_ONLY"});
++          (isFixture ? Object.keys(body).length !== 0 :
++            Object.keys(body).sort().join("|") !== "stationIds")) {
++        return send(res, 400, {ok: false,
++          error: isFixture ? "FIXTURE_EMPTY_BODY_ONLY" : "STATION_SELECTION_ONLY"});
+       }
+       let user;
+       try {
+@@ -77,6 +87,23 @@
+       } catch (_) {
+         return send(res, 401, {ok: false, error: "FIREBASE_TOKEN_INVALID"});
+       }
++      if (!user || typeof user.uid !== "string" || !user.uid.trim()) {
++        return send(res, 401, {ok: false, error: "FIREBASE_TOKEN_INVALID"});
++      }
++      if (isFixture) {
++        const result = await fixturePreflight();
++        if (!result || result.testOnly !== true || result.action !== "none" ||
++            typeof result.reference !== "string" ||
++            !/^SPHOT-ADM-TEST-[A-F0-9]{16}$/.test(result.reference)) {
++          return send(res, 503, {ok: false,
++            error: "ADMIN_TEST_FIXTURE_CONTRACT_INVALID"});
++        }
++        return send(res, 200, {ok: true, ...result,
++          fixtureOnly: true, fixtureStationCount: 3,
++          odooDatabase: TEST_DATABASE, firestoreProject: TEST_PROJECT_ID,
++          prodFirestoreWritten: false, odooWritten: false,
++          activationAttempted: false});
++      }
+       const result = await preflightAdminOffer({db,
+         uid: user.uid, stationIds: body.stationIds,
+         odooClient, database: TEST_DATABASE});
+@@ -109,16 +136,40 @@
+     apiKey: process.env.SPHOT_ODOO_LOCAL_API_KEY,
+     database: TEST_DATABASE,
+   });
++  let fixturePreflight;
++  if (process.env.SPHOT_ADMIN_ODOO_TEST_FIXTURE_READONLY === "true") {
++    // Identifiants ADC explicitement liés au projet C4 TEST.
++    const {readC4Credentials} = require("./start_c4_bridge");
++    const {runFixtureActivation} = require("./odoo_admin_test_fixture_activate");
++    const {createAdminCheckoutClient} = require("./odoo_admin_checkout_client");
++    readC4Credentials();
++    const fixtureApp = admin.initializeApp({projectId: TEST_PROJECT_ID,
++      credential: admin.credential.applicationDefault()},
++    "sphot-admin-fixture-local-readonly");
++    const fixtureDb = admin.firestore(fixtureApp);
++    const checkout = createAdminCheckoutClient({
++      database: TEST_DATABASE, odooClient: odoo,
++    });
++    fixturePreflight = () => runFixtureActivation({
++      db: fixtureDb, database: TEST_DATABASE, checkoutClient: checkout,
++      mode: "preflight",
++    });
++  }
+   const server = createServer({
+     verifyToken: (token) => admin.auth(app).verifyIdToken(token, true),
+     db: admin.firestore(app),
+     odooClient: odoo,
++    fixturePreflight,
+   });
+   server.listen(PORT, HOST, () => {
+     console.log("SPHOT ADMIN : lecture seule sur http://" + HOST +
+         ":" + PORT + "/admin/preflight");
+     console.log("Firebase SPHOT en lecture seule ; Odoo TEST en lecture seule.");
+     console.log("AUCUNE COMMANDE, FACTURE OU ACTIVATION POSSIBLE.");
++    if (fixturePreflight) {
++      console.log("Dossier ADMIN FICTIF C4 TEST : lecture seule activée, " +
++          "sans lien avec les postes du compte réel.");
++    }
+   });
+ }
+ 
+--- a/functions/test/odoo_admin_live_readonly_preflight.test.js
++++ b/functions/test/odoo_admin_live_readonly_preflight.test.js
+@@ -4,9 +4,11 @@
+ const crypto = require("node:crypto");
+ const fs = require("node:fs");
+ const path = require("node:path");
++const {Readable} = require("node:stream");
+ const test = require("node:test");
+ const {preflightAdminOffer, safeStations} =
+   require("../local/odoo_admin_live_readonly_preflight");
++const {createServer} = require("../local/start_admin_odoo_readonly");
+ 
+ const UID = "admin_valid_request_001";
+ const TERRITORY = "territoire_fr_test_001";
+@@ -172,7 +174,8 @@
+       "../local/start_admin_odoo_readonly.js"), "utf8");
+   assert.match(bridge, /FIREBASE_TOKEN_REQUIRED/);
+   assert.match(bridge, /verifyToken\(header\.slice\(7\)\)/);
+-  assert.match(bridge, /req\.url !== "\/admin\/preflight"/);
++  assert.match(bridge, /"\/admin\/fixture-preflight"/);
++  assert.match(bridge, /SPHOT_ADMIN_ODOO_TEST_FIXTURE_READONLY/);
+   assert.doesNotMatch(bridge, /\.set\(|\.update\(|\.runTransaction\(|\.delete\(/);
+ });
+ 
+@@ -187,3 +190,76 @@
+   assert.doesNotMatch(offerHandler, /ScaffoldMessenger\.[\s\S]*?showSnackBar/);
+   assert.match(panel, /child: Material\(\s*color: Colors\.transparent,\s*child: CheckboxListTile/);
+ });
++
++async function simulatedRequest(server, {url = "/admin/fixture-preflight",
++  body = "{}", token = "Bearer valid"} = {}) {
++  return new Promise((resolve, reject) => {
++    const req = Readable.from([body]);
++    req.method = "POST";
++    req.url = url;
++    req.headers = {host: "127.0.0.1:8768",
++      origin: "http://127.0.0.1:52118", authorization: token};
++    const res = {headers: {}, status: null,
++      setHeader(key, value) {this.headers[key] = value;},
++      writeHead(code, headers) {this.status = code;
++        Object.assign(this.headers, headers);},
++      end(data) {resolve({status: this.status, data: JSON.parse(data || "{}")});}};
++    try {server.emit("request", req, res);} catch (error) {reject(error);}
++  });
++}
++
++test("ADMIN fixture : route exclusivement TEST, lecture seule et authentifiée", async () => {
++  let calls = 0;
++  const fixturePreflight = async () => {
++    calls++;
++    return {testOnly: true, action: "none",
++      reference: "SPHOT-ADM-TEST-AE2CF757C9C18535",
++      rightsActive: true, paymentStatus: "not_paid"};
++  };
++  const options = {verifyToken: async () => ({uid: UID}),
++    db: {projectId: "sphot-ab80b",
++      collection() {throw Error("PROD_FIRESTORE_ACCESS_FORBIDDEN");}},
++    odooClient: {async call() {throw Error("ODOO_RPC_NOT_EXPECTED");}},
++    fixturePreflight};
++  const server = createServer(options);
++  const success = await simulatedRequest(server);
++  assert.equal(success.status, 200);
++  assert.equal(success.data.testOnly, true);
++  assert.equal(success.data.fixtureOnly, true);
++  assert.equal(success.data.fixtureStationCount, 3);
++  assert.equal(success.data.paymentStatus, "not_paid");
++  assert.equal(success.data.prodFirestoreWritten, false);
++  assert.equal(success.data.odooWritten, false);
++  assert.equal(success.data.activationAttempted, false);
++  assert.equal(calls, 1);
++
++  const wrongPayload = await simulatedRequest(server, {body: JSON.stringify({
++    stationIds: ["real_station"], adminUid: UID})});
++  assert.equal(wrongPayload.status, 400);
++  assert.equal(calls, 1);
++  const noSession = await simulatedRequest(server, {token: ""});
++  assert.equal(noSession.status, 401);
++  assert.equal(calls, 1);
++  const disabled = await simulatedRequest(createServer({...options,
++    fixturePreflight: undefined}));
++  assert.equal(disabled.status, 404);
++  const invalid = await simulatedRequest(createServer({...options,
++    fixturePreflight: async () => ({testOnly: true, action: "activate",
++      reference: "SPHOT-ADM-TEST-AE2CF757C9C18535"})}));
++  assert.equal(invalid.status, 503);
++});
++
++test("ADMIN fixture Flutter : aucune donnée réelle envoyée, bouton TEST isolé", () => {
++  const service = fs.readFileSync(path.resolve(__dirname,
++      "../../lib/web/admin/services/admin_odoo_local_preflight_service.dart"),
++  "utf8");
++  const fixtureMethod = service.slice(service.indexOf("Future<Map<String, dynamic>> verifyFixture()"));
++  assert.match(fixtureMethod, /uri\.replace\(path: '\/admin\/fixture-preflight'\)/);
++  assert.match(fixtureMethod, /body: '\{\}'/);
++  assert.doesNotMatch(fixtureMethod, /stationIds|billingSiret|SIREN|SIRET/);
++  const panel = fs.readFileSync(path.resolve(__dirname,
++      "../../lib/web/admin/pages/admin_subscription_panel.dart"), "utf8");
++  assert.match(panel, /AdminOdooLocalPreflightService\.fixtureConfigured/);
++  assert.match(panel, /3 postes fictifs, sans lien avec/);
++  assert.match(panel, /TEST ODOO — DOSSIER FICTIF \(3 POSTES\)/);
++});
+--- a/lib/web/admin/services/admin_odoo_local_preflight_service.dart
++++ b/lib/web/admin/services/admin_odoo_local_preflight_service.dart
+@@ -14,6 +14,14 @@
+ 
+   static bool get configured => endpoint.trim().isNotEmpty;
+ 
++  // Visible uniquement sur lancement Flutter explicitement consacré aux tests.
++  static const bool fixtureMode = bool.fromEnvironment(
++    'SPHOT_ADMIN_ODOO_TEST_FIXTURE_READONLY',
++    defaultValue: false,
++  );
++
++  static bool get fixtureConfigured => configured && fixtureMode;
++
+   Future<Map<String, dynamic>> verifySelection({
+     required List<String> stationIds,
+   }) async {
+@@ -61,4 +69,51 @@
+     }
+     return decoded;
+   }
++
++  /// Dossier C4 TEST entièrement fictif : ni les postes, ni l'identité, ni
++  /// les montants du compte connecté ne sont envoyés à cette route.
++  Future<Map<String, dynamic>> verifyFixture() async {
++    if (!fixtureConfigured) {
++      throw StateError('Mode dossier fictif ADMIN TEST désactivé.');
++    }
++    final uri = Uri.tryParse(endpoint);
++    if (uri == null || uri.scheme != 'http' ||
++        uri.host != '127.0.0.1' || uri.port != 8768 ||
++        uri.path != '/admin/preflight' || uri.query.isNotEmpty ||
++        uri.fragment.isNotEmpty || uri.userInfo.isNotEmpty) {
++      throw StateError('Passerelle locale ADMIN TEST non configurée.');
++    }
++    final user = FirebaseAuth.instance.currentUser;
++    final token = await user?.getIdToken();
++    if (user == null || token == null || token.isEmpty) {
++      throw StateError('Session Firebase ADMIN requise.');
++    }
++    final response = await http.post(
++      uri.replace(path: '/admin/fixture-preflight'),
++      headers: {
++        'Content-Type': 'application/json',
++        'Authorization': 'Bearer $token',
++      },
++      body: '{}',
++    ).timeout(const Duration(seconds: 30));
++    final decoded = jsonDecode(response.body);
++    if (decoded is! Map<String, dynamic>) {
++      throw const FormatException('Réponse du dossier fictif illisible.');
++    }
++    if (response.statusCode != 200 || decoded['ok'] != true) {
++      throw StateError(decoded['error']?.toString() ??
++          'Dossier fictif TEST indisponible.');
++    }
++    if (decoded['testOnly'] != true || decoded['fixtureOnly'] != true ||
++        decoded['fixtureStationCount'] != 3 ||
++        decoded['firestoreProject'] != 'sphot-c4-test-20261029' ||
++        decoded['odooDatabase'] != 'sphot_publicitaire_checkout_test' ||
++        decoded['prodFirestoreWritten'] != false ||
++        decoded['odooWritten'] != false ||
++        decoded['activationAttempted'] != false ||
++        decoded['action'] != 'none') {
++      throw const FormatException('Contrat de simulation ADMIN incompatible.');
++    }
++    return decoded;
++  }
+ }
+--- a/lib/web/admin/pages/admin_subscription_panel.dart
++++ b/lib/web/admin/pages/admin_subscription_panel.dart
+@@ -35,6 +35,9 @@
+   String? _savingSection;
+   String? _offerPreflightNotice;
+   bool _offerPreflightOk = false;
++  String? _fixturePreflightNotice;
++  bool _fixturePreflightOk = false;
++  bool _fixturePreflightBusy = false;
+   bool _preparingQuotePdf = false;
+   bool? _draftNoOrderRequired;
+   String? _draftPaymentMethod;
+@@ -553,6 +556,41 @@
+     }
+   }
+ 
++  Future<void> _checkFictitiousOdooFixture() async {
++    if (!mounted || _fixturePreflightBusy ||
++        !AdminOdooLocalPreflightService.fixtureConfigured) return;
++    setState(() {
++      _fixturePreflightBusy = true;
++      _fixturePreflightNotice = null;
++      _fixturePreflightOk = false;
++    });
++    try {
++      final result = await const AdminOdooLocalPreflightService()
++          .verifyFixture();
++      if (!mounted) return;
++      final reference = result['reference']?.toString() ?? '';
++      final unpaid = result['paymentStatus'] == 'not_paid';
++      final activated = result['rightsActive'] == true;
++      setState(() {
++        _fixturePreflightOk = true;
++        _fixturePreflightNotice =
++            'DOSSIER FICTIF C4 TEST : 3 postes fictifs, sans lien avec '
++            'les postes sélectionnés ci-dessus. Référence $reference. '
++            'Facture Odoo TEST ${unpaid ? 'non payée' : 'à vérifier'}. '
++            'Droits Firestore TEST ${activated ? 'déjà actifs sur engagement simulé' : 'non activés'}. '
++            'Aucune nouvelle écriture effectuée.';
++      });
++    } catch (error) {
++      if (!mounted) return;
++      setState(() {
++        _fixturePreflightOk = false;
++        _fixturePreflightNotice = 'Dossier fictif TEST refusé : $error';
++      });
++    } finally {
++      if (mounted) setState(() => _fixturePreflightBusy = false);
++    }
++  }
++
+   InputDecoration _inputDecoration(String label) {
+     return InputDecoration(
+       labelText: label,
+@@ -1289,6 +1327,41 @@
+               ),
+               const SizedBox(height: 12),
+             ],
++            if (AdminOdooLocalPreflightService.fixtureConfigured) ...[
++              OutlinedButton.icon(
++                onPressed: _fixturePreflightBusy
++                    ? null
++                    : _checkFictitiousOdooFixture,
++                icon: const Icon(Icons.science_outlined),
++                label: Text(_fixturePreflightBusy
++                    ? 'LECTURE DU DOSSIER FICTIF TEST…'
++                    : 'TEST ODOO — DOSSIER FICTIF (3 POSTES)'),
++              ),
++              const SizedBox(height: 8),
++              if (_fixturePreflightNotice != null) ...[
++                Container(
++                  padding: const EdgeInsets.all(12),
++                  decoration: BoxDecoration(
++                    color: (_fixturePreflightOk ? _green : _red)
++                        .withOpacity(0.08),
++                    borderRadius: BorderRadius.circular(10),
++                    border: Border.all(
++                      color: (_fixturePreflightOk ? _green : _red)
++                          .withOpacity(0.55),
++                    ),
++                  ),
++                  child: Text(
++                    _fixturePreflightNotice!,
++                    style: TextStyle(
++                      color: _fixturePreflightOk ? _green : _red,
++                      fontSize: 12,
++                      fontWeight: FontWeight.w700,
++                    ),
++                  ),
++                ),
++                const SizedBox(height: 8),
++              ],
++            ],
+             if (isActiveSubscription)
+               const Text(
+                 'Abonnement actif : son montant contractuel reste inchangé. '

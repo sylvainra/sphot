@@ -1,0 +1,155 @@
+diff --git a/functions/index.js b/functions/index.js
+--- a/functions/index.js
++++ b/functions/index.js
+@@ -54,5 +54,12 @@ if (process.env.SPHOT_ENABLE_ADMIN_INITIAL_APPROVAL === "true") {
+   exports.approveAdminInitialRequest =
+       require("./admin_initial_approval").endpoint({admin, onRequest});
+ }
++
++// Autorisation d'essai ADMIN séparée, uniquement après preuve de validation
++// initiale. Désactivée par défaut : test des règles avant tout déploiement.
++if (process.env.SPHOT_ENABLE_ADMIN_TRIAL_AUTHORIZATION === "true") {
++  exports.authorizeAdminTrial =
++      require("./admin_trial_authorization").endpoint({admin, onRequest});
++}
+ 
+ // Expiration vérifiée côté serveur ; préparation seulement, sans activation
+diff --git a/lib/web/super_admin/widgets/super_admin_admin_workflow_panel.dart b/lib/web/super_admin/widgets/super_admin_admin_workflow_panel.dart
+index 1f058d4..a9ab24a 100644
+--- a/lib/web/super_admin/widgets/super_admin_admin_workflow_panel.dart
++++ b/lib/web/super_admin/widgets/super_admin_admin_workflow_panel.dart
+@@ -1,6 +1,7 @@
+ import 'package:cloud_firestore/cloud_firestore.dart';
+ import 'package:flutter/material.dart';
+ import 'package:url_launcher/url_launcher.dart';
++import '../services/super_admin_trial_authorization_service.dart';
+ 
+ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
+   static const Color _blue = Color(0xFF1E3A8A);
+@@ -257,99 +258,27 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
+   Future<void> _approveTrial(
+     BuildContext context,
+     DocumentSnapshot<Map<String, dynamic>> requestSnapshot,
+-    Map<String, dynamic> subscription,
+   ) async {
+     if (!await _confirmTrial(context)) return;
+-
+-    final data = requestSnapshot.data() ?? const <String, dynamic>{};
+-    final trialRequest = _map(data['trialRequest']);
+-    final profile = _map(data['profile']);
+-    final proConnect = _map(data['proConnect']);
+-    final uid = _text(data['uid'] ?? requestSnapshot.id);
+-    final territoire = _map(data['territoire']);
+-    final territoireId = _text(
+-      data['territoireId'] ?? territoire['territoireId'],
+-    );
+-    final email = _text(profile['email'] ?? proConnect['email'] ?? data['email']);
+-    final duration = (trialRequest['trialDurationDays'] is num)
+-        ? (trialRequest['trialDurationDays'] as num).toInt()
+-        : 8;
+-    final numberOfStations = (trialRequest['numberOfRescueStations'] is num)
+-        ? (trialRequest['numberOfRescueStations'] as num).toInt()
+-        : (subscription['numberOfRescueStations'] is num)
+-            ? (subscription['numberOfRescueStations'] as num).toInt()
+-            : 0;
+-
+-    final start = DateTime.now();
+-    final end = start.add(Duration(days: duration));
+-    final db = FirebaseFirestore.instance;
+-    final batch = db.batch();
+-    final serverNow = FieldValue.serverTimestamp();
+-
+-    batch.set(
+-      requestSnapshot.reference,
+-      <String, dynamic>{
+-        'trialRequestStatus': 'approved',
+-        'accessPhase': 'trial_active',
+-        'trialRequest.status': 'approved',
+-        'trialRequest.approvedAt': serverNow,
+-        'trialTracking.status': 'approved',
+-        'trialTracking.approvedAt': serverNow,
+-        'trialTracking.approvedByRole': 'super_admin',
+-        'commercialTracking.status': 'trial_active',
+-        'commercialTracking.trialActivatedAt': serverNow,
+-        'trialApprovalEmail': <String, dynamic>{
+-          'status': 'pending',
+-          'recipient': email,
+-          'sentAt': null,
+-          'messageId': null,
+-          'error': null,
+-          'updatedAt': serverNow,
+-        },
+-        'lastEvent': <String, dynamic>{
+-          'type': 'trial_approved',
+-          'category': 'commercial',
+-          'label': 'Période d’essai SPHOT ADMIN validée',
+-          'createdAt': serverNow,
+-          'createdByRole': 'super_admin',
+-        },
+-        'updatedAt': serverNow,
+-      },
+-      SetOptions(merge: true),
+-    );
+-
+-    batch.set(
+-      db.collection('subscriptions').doc(uid),
+-      <String, dynamic>{
+-        'adminUid': uid,
+-        'status': 'trial',
+-        'trialDurationDays': duration,
+-        'trialStartDate': Timestamp.fromDate(start),
+-        'trialEndDate': Timestamp.fromDate(end),
+-        'numberOfRescueStations': numberOfStations,
+-        'billingCycle': 'annual',
+-        'trialActivatedAt': serverNow,
+-        'updatedAt': serverNow,
+-      },
+-      SetOptions(merge: true),
+-    );
+-
+-    batch.set(
+-      db.collection('admins').doc(uid),
+-      <String, dynamic>{
+-        'uid': uid,
+-        if (territoireId.isNotEmpty) 'territoireId': territoireId,
+-        'accessStatus': 'approved',
+-        'diffusionAccessGranted': true,
+-        'diffusionAccessOpenedAt': serverNow,
+-        'updatedAt': serverNow,
+-      },
+-      SetOptions(merge: true),
+-    );
+-
+-    await batch.commit();
+-
+-    if (!context.mounted) return;
++    try {
++      await SuperAdminTrialAuthorizationService.authorize(requestSnapshot.id);
++    } catch (error) {
++      if (!context.mounted) return;
++      await showDialog<void>(
++        context: context,
++        builder: (dialogContext) => AlertDialog(
++          title: const Text('ESSAI NON AUTORISÉ',
++            style: TextStyle(color: _red, fontWeight: FontWeight.w900)),
++          content: Text(error.toString()),
++          actions: [
++            TextButton(
++              onPressed: () => Navigator.of(dialogContext).pop(),
++              child: const Text('FERMER'),
++            ),
++          ],
++        ),
++      );
++    }
+   }
+ 
+ 
+@@ -1386,7 +1315,6 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
+                               onPressed: () => _approveTrial(
+                                 context,
+                                 requestSnapshot,
+-                                subscription,
+                               ),
+                               icon: const Icon(Icons.play_circle_fill_rounded),
+                               label: const Text(

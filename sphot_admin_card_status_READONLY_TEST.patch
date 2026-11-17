@@ -1,0 +1,297 @@
+--- a/functions/local/start_admin_odoo_readonly.js
++++ b/functions/local/start_admin_odoo_readonly.js
+@@ -21,7 +21,7 @@
+ }
+ 
+ function createServer({verifyToken, db, odooClient,
+-  fixturePreflight} = {}) {
++  fixturePreflight, cardTestStatus} = {}) {
+   if (typeof verifyToken !== "function" ||
+       !db || db.projectId !== FIREBASE_PROJECT_ID ||
+       !odooClient || typeof odooClient.call !== "function") {
+@@ -48,13 +48,18 @@
+     }
+     if (req.method !== "POST" || ![
+       "/admin/preflight", "/admin/fixture-preflight",
++      "/admin/card-test-status",
+     ].includes(req.url)) {
+       return send(res, 404, {ok: false, error: "ADMIN_PREFLIGHT_ONLY"});
+     }
+     const isFixture = req.url === "/admin/fixture-preflight";
++    const isCardStatus = req.url === "/admin/card-test-status";
+     if (isFixture && typeof fixturePreflight !== "function") {
+       return send(res, 404, {ok: false, error: "TEST_FIXTURE_MODE_DISABLED"});
+     }
++    if (isCardStatus && typeof cardTestStatus !== "function") {
++      return send(res, 404, {ok: false, error: "TEST_CARD_STATUS_DISABLED"});
++    }
+     const header = req.headers.authorization || "";
+     if (!header.startsWith("Bearer ") || header.length > 10000) {
+       return send(res, 401, {ok: false, error: "FIREBASE_TOKEN_REQUIRED"});
+@@ -76,10 +81,11 @@
+       // Le mode fictif n'accepte AUCUNE donnée réelle depuis le navigateur.
+       // Le parcours réel conserve ses vérifications et son endpoint séparé.
+       if (!body || Array.isArray(body) || typeof body !== "object" ||
+-          (isFixture ? Object.keys(body).length !== 0 :
++          (isFixture || isCardStatus ? Object.keys(body).length !== 0 :
+             Object.keys(body).sort().join("|") !== "stationIds")) {
+         return send(res, 400, {ok: false,
+-          error: isFixture ? "FIXTURE_EMPTY_BODY_ONLY" : "STATION_SELECTION_ONLY"});
++          error: isFixture || isCardStatus ?
++            "FIXTURE_EMPTY_BODY_ONLY" : "STATION_SELECTION_ONLY"});
+       }
+       let user;
+       try {
+@@ -104,6 +110,21 @@
+           prodFirestoreWritten: false, odooWritten: false,
+           activationAttempted: false});
+       }
++      if (isCardStatus) {
++        const result = await cardTestStatus();
++        if (!result || result.testOnly !== true ||
++            result.fixtureOnly !== true || result.action !== "none" ||
++            !/^SPHOT-ADM-TEST-[A-F0-9]{16}$/.test(result.reference) ||
++            result.firestoreProject !== TEST_PROJECT_ID ||
++            result.odooDatabase !== TEST_DATABASE ||
++            result.prodFirestoreWritten !== false ||
++            result.odooWritten !== false ||
++            result.activationAttempted !== false) {
++          return send(res, 503, {ok: false,
++            error: "ADMIN_CARD_STATUS_CONTRACT_INVALID"});
++        }
++        return send(res, 200, {ok: true, ...result});
++      }
+       const result = await preflightAdminOffer({db,
+         uid: user.uid, stationIds: body.stationIds,
+         odooClient, database: TEST_DATABASE});
+@@ -137,7 +158,12 @@
+     database: TEST_DATABASE,
+   });
+   let fixturePreflight;
+-  if (process.env.SPHOT_ADMIN_ODOO_TEST_FIXTURE_READONLY === "true") {
++  let cardTestStatus;
++  const fixtureEnabled =
++    process.env.SPHOT_ADMIN_ODOO_TEST_FIXTURE_READONLY === "true";
++  const cardEnabled =
++    process.env.SPHOT_ADMIN_ODOO_TEST_CARD_STATUS_READONLY === "true";
++  if (fixtureEnabled || cardEnabled) {
+     // Identifiants ADC explicitement liés au projet C4 TEST.
+     const {readC4Credentials} = require("./start_c4_bridge");
+     readC4Credentials();
+@@ -145,21 +171,31 @@
+       credential: admin.credential.applicationDefault()},
+     "sphot-admin-fixture-local-readonly");
+     const fixtureDb = admin.firestore(fixtureApp);
+-    const {runFixtureActivation} = require("./odoo_admin_test_fixture_activate");
+-    const {createAdminCheckoutClient} = require("./odoo_admin_checkout_client");
+-    const checkout = createAdminCheckoutClient({
+-      database: TEST_DATABASE, odooClient: odoo,
+-    });
+-    fixturePreflight = () => runFixtureActivation({
+-      db: fixtureDb, database: TEST_DATABASE, checkoutClient: checkout,
+-      mode: "preflight",
+-    });
++    if (fixtureEnabled) {
++      const {runFixtureActivation} = require("./odoo_admin_test_fixture_activate");
++      const {createAdminCheckoutClient} = require("./odoo_admin_checkout_client");
++      const checkout = createAdminCheckoutClient({
++        database: TEST_DATABASE, odooClient: odoo,
++      });
++      fixturePreflight = () => runFixtureActivation({
++        db: fixtureDb, database: TEST_DATABASE, checkoutClient: checkout,
++        mode: "preflight",
++      });
++    }
++    if (cardEnabled) {
++      const {readCardTestStatus} =
++        require("./odoo_admin_card_test_status_readonly");
++      cardTestStatus = () => readCardTestStatus({
++        db: fixtureDb, odooClient: odoo, database: TEST_DATABASE,
++      });
++    }
+   }
+   const server = createServer({
+     verifyToken: (token) => admin.auth(app).verifyIdToken(token, true),
+     db: admin.firestore(app),
+     odooClient: odoo,
+     fixturePreflight,
++    cardTestStatus,
+   });
+   server.listen(PORT, HOST, () => {
+     console.log("SPHOT ADMIN : lecture seule sur http://" + HOST +
+@@ -170,6 +206,10 @@
+       console.log("Dossier ADMIN FICTIF C4 TEST : lecture seule activée, " +
+           "sans lien avec les postes du compte réel.");
+     }
++    if (cardTestStatus) {
++      console.log("Cycle ADMIN CARTE FICTIF C4 TEST : statut Odoo/Stripe/" +
++          "Firestore en lecture seule disponible.");
++    }
+   });
+ }
+ 
+--- a/lib/web/admin/services/admin_odoo_local_preflight_service.dart
++++ b/lib/web/admin/services/admin_odoo_local_preflight_service.dart
+@@ -22,6 +22,15 @@
+ 
+   static bool get fixtureConfigured => configured && fixtureMode;
+ 
++  // Consultation facultative du cycle CARTE fictif C4 TEST déjà exercé
++  // manuellement dans Odoo. Ne concerne jamais le compte connecté.
++  static const bool cardStatusMode = bool.fromEnvironment(
++    'SPHOT_ADMIN_ODOO_TEST_CARD_STATUS_READONLY',
++    defaultValue: false,
++  );
++
++  static bool get cardStatusConfigured => configured && cardStatusMode;
++
+   Future<Map<String, dynamic>> verifySelection({
+     required List<String> stationIds,
+   }) async {
+@@ -117,4 +126,57 @@
+     return decoded;
+   }
+ 
++  Future<Map<String, dynamic>> verifyCardTestStatus() async {
++    if (!cardStatusConfigured) {
++      throw StateError('Contrôle du cycle CARTE fictif TEST désactivé.');
++    }
++    final uri = Uri.tryParse(endpoint);
++    if (uri == null || uri.scheme != 'http' ||
++        uri.host != '127.0.0.1' || uri.port != 8768 ||
++        uri.path != '/admin/preflight' || uri.query.isNotEmpty ||
++        uri.fragment.isNotEmpty || uri.userInfo.isNotEmpty) {
++      throw StateError('Passerelle locale ADMIN TEST non configurée.');
++    }
++    final user = FirebaseAuth.instance.currentUser;
++    final token = await user?.getIdToken();
++    if (user == null || token == null || token.isEmpty) {
++      throw StateError('Session Firebase ADMIN requise.');
++    }
++    final response = await http.post(
++      uri.replace(path: '/admin/card-test-status'),
++      headers: {
++        'Content-Type': 'application/json',
++        'Authorization': 'Bearer $token',
++      },
++      body: '{}',
++    ).timeout(const Duration(seconds: 30));
++    final decoded = jsonDecode(response.body);
++    if (decoded is! Map<String, dynamic>) {
++      throw const FormatException('Statut CARTE TEST illisible.');
++    }
++    if (response.statusCode != 200 || decoded['ok'] != true) {
++      throw StateError(decoded['error']?.toString() ??
++          'Cycle CARTE TEST indisponible.');
++    }
++    if (decoded['testOnly'] != true || decoded['fixtureOnly'] != true ||
++        decoded['action'] != 'none' ||
++        decoded['firestoreProject'] != 'sphot-c4-test-20261029' ||
++        decoded['odooDatabase'] != 'sphot_publicitaire_checkout_test' ||
++        decoded['stationCount'] != 2 ||
++        decoded['expectedHtCents'] != 89800 ||
++        decoded['expectedTtcCents'] != 107760 ||
++        decoded['prodFirestoreWritten'] != false ||
++        decoded['odooWritten'] != false ||
++        decoded['activationAttempted'] != false) {
++      throw const FormatException('Contrat CARTE TEST incompatible.');
++    }
++    if (decoded['activationVerified'] == true &&
++        (decoded['stripeVerified'] != true ||
++        decoded['paymentStatus'] != 'paid' ||
++        decoded['activationBasis'] != 'stripe_verified' ||
++        decoded['nextGate'] != 'TEST_CYCLE_COMPLETE')) {
++      throw const FormatException('Preuve d’activation CARTE TEST invalide.');
++    }
++    return decoded;
++  }
+ }
+--- a/lib/web/admin/pages/admin_subscription_panel.dart
++++ b/lib/web/admin/pages/admin_subscription_panel.dart
+@@ -38,6 +38,9 @@
+   String? _fixturePreflightNotice;
+   bool _fixturePreflightOk = false;
+   bool _fixturePreflightBusy = false;
++  String? _cardTestStatusNotice;
++  bool _cardTestStatusVerified = false;
++  bool _cardTestStatusBusy = false;
+   bool _preparingQuotePdf = false;
+   bool? _draftNoOrderRequired;
+   String? _draftPaymentMethod;
+@@ -591,6 +594,41 @@
+     }
+   }
+ 
++  Future<void> _checkFictitiousCardTestStatus() async {
++    if (!mounted || _cardTestStatusBusy ||
++        !AdminOdooLocalPreflightService.cardStatusConfigured) return;
++    setState(() {
++      _cardTestStatusBusy = true;
++      _cardTestStatusNotice = null;
++      _cardTestStatusVerified = false;
++    });
++    try {
++      final result = await const AdminOdooLocalPreflightService()
++          .verifyCardTestStatus();
++      if (!mounted) return;
++      final reference = result['reference']?.toString() ?? '';
++      final verified = result['activationVerified'] == true;
++      setState(() {
++        _cardTestStatusVerified = verified;
++        _cardTestStatusNotice = verified
++            ? 'CARTE FICTIVE C4 TEST VALIDÉE — $reference. '
++              'Facture Odoo TEST rapprochée, paiement Stripe TEST vérifié, '
++              'droits Firestore C4 TEST activés. Aucun droit sur ce compte ADMIN.'
++            : 'CARTE FICTIVE C4 TEST — $reference. '
++              'Étape en attente : ${result['nextGate']}. '
++              'Aucun droit sur ce compte ADMIN.';
++      });
++    } catch (error) {
++      if (!mounted) return;
++      setState(() {
++        _cardTestStatusVerified = false;
++        _cardTestStatusNotice = 'Vérification CARTE TEST refusée : $error';
++      });
++    } finally {
++      if (mounted) setState(() => _cardTestStatusBusy = false);
++    }
++  }
++
+   InputDecoration _inputDecoration(String label) {
+     return InputDecoration(
+       labelText: label,
+@@ -1727,6 +1765,34 @@
+           style: TextStyle(color: _grey, fontSize: 11, height: 1.35),
+         ),
+         const SizedBox(height: 14),
++        if (AdminOdooLocalPreflightService.cardStatusConfigured) ...[
++          OutlinedButton.icon(
++            onPressed: _cardTestStatusBusy
++                ? null : _checkFictitiousCardTestStatus,
++            icon: const Icon(Icons.science_outlined, size: 18),
++            label: const Text('VÉRIFIER CARTE FICTIVE C4 TEST'),
++          ),
++          if (_cardTestStatusNotice != null) ...[
++            const SizedBox(height: 8),
++            Container(
++              width: double.infinity,
++              padding: const EdgeInsets.all(12),
++              decoration: BoxDecoration(
++                color: _cardTestStatusVerified
++                    ? _green.withOpacity(0.08) : _orange.withOpacity(0.08),
++                border: Border.all(
++                  color: _cardTestStatusVerified ? _green : _orange,
++                ),
++                borderRadius: BorderRadius.circular(9),
++              ),
++              child: Text(_cardTestStatusNotice!,
++                style: TextStyle(fontSize: 11,
++                  fontWeight: FontWeight.w700,
++                  color: _cardTestStatusVerified ? _green : _blue)),
++            ),
++          ],
++          const SizedBox(height: 12),
++        ],
+         SizedBox(
+           width: double.infinity, height: 44,
+           child: ElevatedButton.icon(

@@ -1,0 +1,11 @@
+{
+  "firestore": {
+    "rules": "functions/local/firestore_security_admin_TEST.rules"
+  },
+  "emulators": {
+    "firestore": {
+      "host": "127.0.0.1",
+      "port": 8181
+    }
+  }
+}

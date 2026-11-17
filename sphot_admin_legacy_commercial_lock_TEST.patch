@@ -1,0 +1,623 @@
+diff --git a/functions/admin_workflow.js b/functions/admin_workflow.js
+index aea3ae5..ed0203b 100644
+--- a/functions/admin_workflow.js
++++ b/functions/admin_workflow.js
+@@ -1304,42 +1304,12 @@ exports.activateApprovedAdminOrder = onDocumentUpdated(
+       const after = event.data?.after.data() || {};
+       if (cleanValue(before.status) === cleanValue(after.status)) return;
+       if (!["approved", "paid"].includes(cleanValue(after.status))) return;
+-      if (after.subscriptionActivatedAt) return;
+-
+-      const db = admin.firestore();
+-      const uid = cleanValue(after.adminUid);
+-      if (!uid) return;
+-      const start = new Date();
+-      const end = new Date(start);
+-      end.setFullYear(end.getFullYear() + 1);
+-      const batch = db.batch();
+-      batch.set(db.collection("subscriptions").doc(uid), {
+-        status: "active",
+-        subscriptionStartDate: admin.firestore.Timestamp.fromDate(start),
+-        subscriptionEndDate: admin.firestore.Timestamp.fromDate(end),
+-        billingCycle: "annual",
+-        currentOrderId: event.params.orderId,
+-        currentOrderNumber: after.orderNumber || null,
+-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+-      }, {merge: true});
+-      batch.set(db.collection("admins").doc(uid), {
+-        diffusionAccessGranted: true,
+-        diffusionAccessOpenedAt: admin.firestore.FieldValue.serverTimestamp(),
+-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+-      }, {merge: true});
+-      if (after.requestId) {
+-        batch.set(db.collection("adminRequests").doc(after.requestId), {
+-          accessPhase: "subscription_active",
+-          "commercialTracking.status": "subscription_active",
+-          "commercialTracking.subscriptionActivatedAt":
+-              admin.firestore.FieldValue.serverTimestamp(),
+-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+-        }, {merge: true});
+-      }
+-      batch.set(event.data.after.ref, {
+-        subscriptionActivatedAt: admin.firestore.FieldValue.serverTimestamp(),
+-      }, {merge: true});
+-      await batch.commit();
++      // Le statut historique d'une commande Firestore n'est pas une preuve
++      // de contrat vérifié, ni de facture Odoo, ni de paiement Stripe.
++      // Garder le trigger déployable, mais sans aucun effet commercial.
++      // L'activation est exclusivement une projection serveur Odoo vérifiée.
++      console.warn("SPHOT ADMIN: commande historique ignorée; "+
++          "activation via Odoo uniquement", event.params?.orderId);
+     },
+ );
+ 
+diff --git a/lib/web/admin/pages/admin_subscription_panel.dart b/lib/web/admin/pages/admin_subscription_panel.dart
+index e87df6d..8e73b0a 100644
+--- a/lib/web/admin/pages/admin_subscription_panel.dart
++++ b/lib/web/admin/pages/admin_subscription_panel.dart
+@@ -453,6 +453,21 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
+   ) async {
+     if (_uid.isEmpty || _savingSection != null) return;
+ 
++    // Les postes sélectionnés et le prix contractuel doivent être attestés
++    // côté serveur (tarif, territoire, Odoo), jamais enregistrés depuis Flutter.
++    if (section == 'offer') {
++      if (!mounted) return;
++      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
++        const SnackBar(
++          content: Text(
++            'Devis consultable, mais enregistrement commercial en attente '
++            'de validation serveur Odoo. Aucune sélection facturable enregistrée.',
++          ),
++        ),
++      );
++      return;
++    }
++
+     setState(() {
+       _savingSection = section;
+     });
+diff --git a/lib/web/super_admin/pages/super_admin_subscriptions_page.dart b/lib/web/super_admin/pages/super_admin_subscriptions_page.dart
+index b4e359f..c04c1d0 100644
+--- a/lib/web/super_admin/pages/super_admin_subscriptions_page.dart
++++ b/lib/web/super_admin/pages/super_admin_subscriptions_page.dart
+@@ -245,35 +245,31 @@ class _SuperAdminSubscriptionsPageState extends State<SuperAdminSubscriptionsPag
+     );
+   }
+ 
+-    Future<void> _updateSubscriptionStatus(
++  Future<void> _updateSubscriptionStatus(
+     String subscriptionId,
+     String newStatus,
+   ) async {
+-    final now = DateTime.now();
+-
+-    final data = <String, dynamic>{
+-      'status': newStatus,
+-      'updatedAt': FieldValue.serverTimestamp(),
+-    };
+-
+-    if (newStatus == 'active') {
+-      data.addAll({
+-        'subscriptionStartDate': Timestamp.fromDate(now),
+-        'subscriptionEndDate': Timestamp.fromDate(
+-          DateTime(now.year + 1, now.month, now.day),
++    // Les boutons historiques restent visibles pour la compréhension du
++    // dossier, mais aucun statut ni paiement ne peut être inventé côté UI.
++    if (!mounted) return;
++    await showDialog<void>(
++      context: context,
++      builder: (dialogContext) => AlertDialog(
++        title: const Text('MODIFICATION COMMERCIALE BLOQUÉE'),
++        content: Text(
++          'Abonnement $subscriptionId : le changement vers « $newStatus » '
++          'n’a pas été enregistré. Les statuts commerciaux SPHOT ADMIN '
++          'devront être établis par vérification serveur Odoo '
++          'et projection sécurisée Firestore.',
+         ),
+-        'lastPaymentDate': Timestamp.fromDate(now),
+-        'nextInvoiceDate': Timestamp.fromDate(now),
+-      });
+-    }
+-
+-    await FirebaseFirestore.instance
+-        .collection('subscriptions')
+-        .doc(subscriptionId)
+-        .set(
+-          data,
+-          SetOptions(merge: true),
+-        );
++        actions: [
++          TextButton(
++            onPressed: () => Navigator.of(dialogContext).pop(),
++            child: const Text('FERMER'),
++          ),
++        ],
++      ),
++    );
+   }
+ 
+   @override
+@@ -739,4 +735,4 @@ Text(
+       },
+     );
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/functions/index.js b/functions/index.js
+index 7f762c3..746d3eb 100644
+--- a/functions/index.js
++++ b/functions/index.js
+@@ -4322,6 +4336,10 @@ exports.updateSubscriptionStatuses = onSchedule(
+       });
+ 
+       activeSnapshot.docs.forEach((doc) => {
++        // Les retards de paiement des cycles ADMIN suivis dans Odoo donnent
++        // lieu à relances, jamais à une suspension automatique de diffusion.
++        // L'échéance annuelle reste gérée par processSubscriptionLifecycle.
++        if ((doc.data() || {}).odooAdminManaged === true) return;
+         batch.set(
+             doc.ref,
+             {
+diff --git a/lib/web/super_admin/widgets/super_admin_admin_workflow_panel.dart b/lib/web/super_admin/widgets/super_admin_admin_workflow_panel.dart
+--- a/lib/web/super_admin/widgets/super_admin_admin_workflow_panel.dart
++++ b/lib/web/super_admin/widgets/super_admin_admin_workflow_panel.dart
+@@ -59,14 +59,6 @@
+     return null;
+   }
+ 
+-  String _firstNonEmpty(Iterable<dynamic> values) {
+-    for (final value in values) {
+-      final result = _text(value);
+-      if (result.isNotEmpty) return result;
+-    }
+-    return '';
+-  }
+-
+   String _formatMoney(dynamic value) {
+     final number = value is num
+         ? value.toDouble()
+@@ -280,380 +272,68 @@
+       );
+     }
+   }
+-  // Renouvellement de huit jours, compatible avec les variantes historiques
+-  // des dossiers. Les champs facultatifs absents ne sont jamais exigés.
+-  Future<void> _renewTrial(
+-    BuildContext context,
+-    DocumentSnapshot<Map<String, dynamic>> requestSnapshot,
+-  ) async {
+-    var typedReason = '';
+-    final reason = await showDialog<String>(
+-        context: context,
+-        builder: (dialogContext) => AlertDialog(
+-          title: const Text(
+-            'RENOUVELER LA PÉRIODE D’ESSAI',
+-            style: TextStyle(color: _blue, fontWeight: FontWeight.w900),
+-          ),
+-          content: Column(
+-            mainAxisSize: MainAxisSize.min,
+-            crossAxisAlignment: CrossAxisAlignment.start,
+-            children: [
+-              const Text(
+-                'Accorder huit nouveaux jours à compter de maintenant ? '
+-                'Les droits temps réel seront réactivés. '
+-                'L’essai précédent restera dans l’historique.',
+-              ),
+-              const SizedBox(height: 12),
+-              TextField(
+-                onChanged: (value) => typedReason = value,
+-                maxLines: 2,
+-                maxLength: 250,
+-                decoration: const InputDecoration(
+-                  labelText: 'Motif (facultatif)',
+-                  border: OutlineInputBorder(),
+-                ),
+-              ),
+-            ],
+-          ),
+-          actions: [
+-            TextButton(
+-              onPressed: () => Navigator.of(dialogContext).pop(),
+-              child: const Text('ANNULER'),
+-            ),
+-            ElevatedButton(
+-              onPressed: () => Navigator.of(dialogContext)
+-                  .pop(typedReason.trim()),
+-              style: ElevatedButton.styleFrom(
+-                backgroundColor: _blue,
+-                foregroundColor: Colors.white,
+-              ),
+-              child: const Text('CONFIRMER LES 8 JOURS'),
+-            ),
+-          ],
+-        ),
+-      );
+-    if (reason == null || !context.mounted) return;
+-
+-    final db = FirebaseFirestore.instance;
+-    final requestRef = requestSnapshot.reference;
+-    final initialRequest = requestSnapshot.data() ?? const <String, dynamic>{};
+-    var uid = _firstNonEmpty([
+-      initialRequest['uid'],
+-      adminData['uid'],
+-      initialRequest['adminUid'],
+-      adminData['adminUid'],
+-      requestSnapshot.id,
+-    ]);
+-
+-    try {
+-      // Ne pas créer silencieusement un deuxième abonnement lorsque
+-      // l'ancien utilise un ID de document différent de l'UID.
+-      var subscriptionRef = db.collection('subscriptions').doc(uid);
+-      final directSubscription = await subscriptionRef.get();
+-      if (!directSubscription.exists) {
+-        final matches = <String, DocumentSnapshot<Map<String, dynamic>>>{};
+-        for (final pair in <(String, String)>[
+-          ('adminUid', uid),
+-          ('uid', uid),
+-          ('requestId', requestSnapshot.id),
+-        ]) {
+-          final found = await db
+-              .collection('subscriptions')
+-              .where(pair.$1, isEqualTo: pair.$2)
+-              .limit(2)
+-              .get();
+-          for (final doc in found.docs) {
+-            matches[doc.id] = doc;
+-          }
+-        }
+-        if (matches.length > 1) {
+-          throw StateError(
+-            'Plusieurs abonnements correspondent à ce dossier. '
+-            'Vérification manuelle nécessaire.',
+-          );
+-        }
+-        if (matches.isNotEmpty) {
+-          final existing = matches.values.single;
+-          subscriptionRef = existing.reference;
+-          uid = _firstNonEmpty([
+-            initialRequest['uid'],
+-            existing.data()?['adminUid'],
+-            existing.data()?['uid'],
+-            uid,
+-          ]);
+-        }
+-      }
+-      var adminRef = db.collection('admins').doc(uid);
+-      if (subscriptionRef.id != uid) {
+-        // Le calcul des droits temps réel associe admins/{id} à
+-        // subscriptions/{id}. Vérifier la paire des anciens dossiers.
+-        final legacyAdminRef = db.collection('admins').doc(subscriptionRef.id);
+-        final legacyAdmin = await legacyAdminRef.get();
+-        final legacyUid = _text(legacyAdmin.data()?['uid']);
+-        if (!legacyAdmin.exists ||
+-            (legacyUid.isNotEmpty && legacyUid != uid)) {
+-          throw StateError(
+-            'Ancien abonnement avec identifiant différent et sans compte '
+-            'Admin correspondant : vérification manuelle nécessaire.',
+-          );
+-        }
+-        adminRef = legacyAdminRef;
+-      }
+-      final start = DateTime.now();
+-      final end = start.add(const Duration(days: 8));
+-      final stampStart = Timestamp.fromDate(start);
+-      final stampEnd = Timestamp.fromDate(end);
+-
+-      await db.runTransaction<void>((transaction) async {
+-        // Lire les trois documents avant toute écriture (transaction atomique).
+-        final requestDoc = await transaction.get(requestRef);
+-        final subscriptionDoc = await transaction.get(subscriptionRef);
+-        final adminDoc = await transaction.get(adminRef);
+-        if (!requestDoc.exists) {
+-          throw StateError('Dossier administrateur introuvable.');
+-        }
+-        final request = requestDoc.data() ?? const <String, dynamic>{};
+-        final subscription =
+-            subscriptionDoc.data() ?? const <String, dynamic>{};
+-        final admin = adminDoc.data() ?? const <String, dynamic>{};
+-        final trialRequest = _map(request['trialRequest']);
+-        final trialTracking = _map(request['trialTracking']);
+-        final administrativeTracking = _map(request['administrativeTracking']);
+-        final territory = _map(request['territoire']);
+-
+-        final registrationStatus =
+-            _text(request['status']).toLowerCase();
+-        final administrativeStatus =
+-            _text(administrativeTracking['status']).toLowerCase();
+-        final adminStatus = _text(admin['accessStatus']).toLowerCase();
+-        final trialStatus = _firstNonEmpty([
+-          request['trialRequestStatus'],
+-          trialTracking['status'],
+-          trialRequest['status'],
+-        ]).toLowerCase();
+-        final subStatus = _text(subscription['status']).toLowerCase();
+-
+-        // Ne jamais rattacher par erreur l'abonnement d'un autre Admin.
+-        final subscriptionOwner = _firstNonEmpty([
+-          subscription['adminUid'],
+-          subscription['uid'],
+-        ]);
+-        if (subscriptionOwner.isNotEmpty && subscriptionOwner != uid) {
+-          throw StateError(
+-            'L’identifiant du compte et celui de l’abonnement diffèrent. '
+-            'Vérification manuelle nécessaire.',
+-          );
+-        }
+-
+-        if (registrationStatus == 'rejected' ||
+-            administrativeStatus == 'rejected' ||
+-            adminStatus == 'rejected' ||
+-            trialStatus == 'rejected') {
+-          throw StateError(
+-            'Le dossier comporte un refus explicite. '
+-            'Le renouvellement ne peut pas le contourner.',
+-          );
+-        }
+-        if (subStatus == 'active' ||
+-            subStatus == 'subscription_active' ||
+-            subscription['subscriptionStartDate'] != null ||
+-            subscription['subscriptionEndDate'] != null ||
+-            subscription['lastPaymentDate'] != null) {
+-          throw StateError(
+-            'Un abonnement payant existe pour ce dossier. '
+-            'Ne pas le remplacer par un essai.',
+-          );
+-        }
+-
+-        // Un essai ancien peut ne pas avoir toutes les dates ou tous les
+-        // objets de suivi des dossiers récemment créés.
+-        final pastTrial = subscription['trialStartDate'] != null ||
+-            subscription['trialEndDate'] != null ||
+-            subscription['trialActivatedAt'] != null ||
+-            trialTracking['approvedAt'] != null ||
+-            trialRequest['approvedAt'] != null ||
+-            const <String>{'expired', 'approved', 'trial'}
+-                .contains(trialStatus) ||
+-            const <String>{'awaiting_subscription', 'trial', 'overdue'}
+-                .contains(subStatus);
+-        if (!pastTrial) {
+-          throw StateError(
+-            'Aucun essai antérieur identifiable. '
+-            'Utiliser la validation initiale de l’essai.',
+-          );
+-        }
+-        final knownApproval = registrationStatus == 'approved' ||
+-            administrativeStatus == 'approved' ||
+-            adminStatus == 'approved' ||
+-            trialTracking['approvedAt'] != null ||
+-            trialRequest['approvedAt'] != null;
+-        if (!knownApproval) {
+-          throw StateError(
+-            'L’autorisation administrative du dossier est incertaine. '
+-            'Vérifier l’accès Admin avant de renouveler.',
+-          );
+-        }
+-        final oldEnd = _firestoreDate(subscription['trialEndDate']);
+-        if (oldEnd != null && oldEnd.isAfter(start)) {
+-          throw StateError(
+-            'La période d’essai est encore en cours. '
+-            'Attendre son terme avant de la renouveler.',
+-          );
+-        }
+-
+-        final territoireId = _firstNonEmpty([
+-          admin['territoireId'],
+-          request['territoireId'],
+-          territory['territoireId'],
+-          subscription['territoireId'],
+-          adminData['territoireId'],
+-          _map(adminData['territoire'])['territoireId'],
+-        ]);
+-        if (territoireId.isEmpty) {
+-          throw StateError(
+-            'Aucun territoire lié au dossier : impossible de garantir '
+-            'la réactivation des SPHOTS surveillés. À vérifier.',
+-          );
+-        }
+-
+-        final previousEvent = <String, dynamic>{
+-          'renewedAt': stampStart,
+-          'previousStatus': subStatus,
+-          'previousStartDate': subscription['trialStartDate'],
+-          'previousEndDate': subscription['trialEndDate'],
+-          'previousExpiredAt': subscription['trialExpiredAt'],
+-          'previousLastEvent': request['lastEvent'],
+-          'newStartDate': stampStart,
+-          'newEndDate': stampEnd,
+-          'durationDays': 8,
+-          'reason': reason,
+-          'createdByRole': 'super_admin',
+-          'subscriptionDocumentId': subscriptionRef.id,
+-        };
+-        final serverNow = FieldValue.serverTimestamp();
+-
+-        // Update avec chemins imbriqués : n'écrase pas les Map héritées.
+-        transaction.update(requestRef, <String, dynamic>{
+-          'trialRequestStatus': 'approved',
+-          'accessPhase': 'trial_active',
+-          'trialRequest.status': 'approved',
+-          'trialTracking.status': 'approved',
+-          'commercialTracking.status': 'trial_active',
+-          'commercialTracking.trialActivatedAt': serverNow,
+-          'trialRenewalHistory': FieldValue.arrayUnion([previousEvent]),
+-          'trialRenewalCount': FieldValue.increment(1),
+-          'lastEvent': <String, dynamic>{
+-            'type': 'trial_renewed',
+-            'category': 'commercial',
+-            'label': 'Période d’essai SPHOT ADMIN renouvelée (8 jours)',
+-            'createdAt': serverNow,
+-            'createdByRole': 'super_admin',
+-          },
+-          'updatedAt': serverNow,
+-        });
+-
+-        // Conserver la facturation, les montants et les champs historiques.
+-        transaction.set(subscriptionRef, <String, dynamic>{
+-          'adminUid': uid,
+-          'status': 'trial',
+-          'trialDurationDays': 8,
+-          'trialStartDate': stampStart,
+-          'trialEndDate': stampEnd,
+-          'trialActivatedAt': serverNow,
+-          'trialExpiredAt': FieldValue.delete(),
+-          'trialReminder48hSentAt': FieldValue.delete(),
+-          'updatedAt': serverNow,
+-        }, SetOptions(merge: true));
+-
+-        transaction.set(adminRef, <String, dynamic>{
+-          'uid': uid,
+-          'territoireId': territoireId,
+-          'accessStatus': 'approved',
+-          'diffusionAccessGranted': true,
+-          'diffusionAccessOpenedAt': serverNow,
+-          'diffusionAccessClosedAt': FieldValue.delete(),
+-          'updatedAt': serverNow,
+-        }, SetOptions(merge: true));
+-      });
+-
+-      // La fiche se met à jour via ses StreamBuilder Firestore.
+-      // Pas de bannière temporaire de confirmation en bas de l'écran.
+-    } catch (error) {
+-      if (!context.mounted) return;
+-      // Un échec doit rester explicite : ne jamais laisser croire que
+-      // les droits ont été réactivés si la transaction a échoué.
+-      await showDialog<void>(
+-        context: context,
+-        builder: (dialogContext) => AlertDialog(
+-          title: const Text(
+-            'RENOUVELLEMENT NON EFFECTUÉ',
+-            style: TextStyle(color: _red, fontWeight: FontWeight.w900),
+-          ),
+-          content: Text(
+-            error is StateError ? error.message.toString() : error.toString(),
+-          ),
+-          actions: [
+-            TextButton(
+-              onPressed: () => Navigator.of(dialogContext).pop(),
+-              child: const Text('FERMER'),
+-            ),
+-          ],
+-        ),
+-      );
+-    }
+-  }
+-
+-  Future<void> _approveOrder(
+-    BuildContext context,
+-    QueryDocumentSnapshot<Map<String, dynamic>> order,
+-  ) async {
+-    final data = order.data();
+-    final paymentMethod = _text(data['paymentMethod']);
+-    if (paymentMethod == 'card' && _text(data['paymentStatus']) != 'paid') {
+-      return;
+-    }
+-
+-    final confirmed = await showDialog<bool>(
+-          context: context,
+-          builder: (dialogContext) => AlertDialog(
+-            title: const Text(
+-              'APPROUVER LA COMMANDE',
+-              style: TextStyle(color: _blue, fontWeight: FontWeight.w900),
+-            ),
+-            content: Text(
+-              'Confirmer la commande ${_text(data['orderNumber'])}. '
+-              'L’abonnement annuel sera activé et les droits de diffusion seront ouverts.',
+-            ),
+-            actions: [
+-              TextButton(
+-                onPressed: () => Navigator.of(dialogContext).pop(false),
+-                child: const Text('ANNULER'),
+-              ),
+-              ElevatedButton(
+-                onPressed: () => Navigator.of(dialogContext).pop(true),
+-                style: ElevatedButton.styleFrom(
+-                  backgroundColor: _red,
+-                  foregroundColor: Colors.white,
+-                ),
+-                child: const Text('APPROUVER'),
+-              ),
+-            ],
+-          ),
+-        ) ??
+-        false;
+-
+-    if (!confirmed) return;
+-    await order.reference.set(
+-      <String, dynamic>{
+-        'status': 'approved',
+-        'approvedAt': FieldValue.serverTimestamp(),
+-        'approvedByRole': 'super_admin',
+-        'updatedAt': FieldValue.serverTimestamp(),
+-      },
+-      SetOptions(merge: true),
+-    );
+-  }
+-
++  // Le renouvellement exceptionnel sera un circuit serveur distinct.
++  // La prolongation est une décision Super Admin distincte de l'essai initial.
++  // L'ancienne transaction Flutter ne peut plus attribuer de droits.
++  Future<void> _renewTrial(
++    BuildContext context,
++    DocumentSnapshot<Map<String, dynamic>> requestSnapshot,
++  ) async {
++    if (!context.mounted) return;
++    await showDialog<void>(
++      context: context,
++      builder: (dialogContext) => AlertDialog(
++        title: const Text(
++          'RENOUVELLEMENT SOUMIS À VALIDATION SERVEUR',
++          style: TextStyle(color: _blue, fontWeight: FontWeight.w900),
++        ),
++        content: Text(
++          'Dossier ${requestSnapshot.id} : aucune prolongation '
++          'de huit jours n’a été effectuée. Cette décision devra '
++          'être vérifiée et enregistrée par une fonction serveur '
++          'Super Admin dédiée, avec un nouvel historique.',
++        ),
++        actions: [
++          TextButton(
++            onPressed: () => Navigator.of(dialogContext).pop(),
++            child: const Text('FERMER'),
++          ),
++        ],
++      ),
++    );
++  }
++
++  Future<void> _approveOrder(
++    BuildContext context,
++    QueryDocumentSnapshot<Map<String, dynamic>> order,
++  ) async {
++    final data = order.data();
++    // L'ancienne approbation de commande n'est pas une preuve Odoo.
++    // Le bouton reste présent sans aucune écriture client.
++    if (!context.mounted) return;
++    await showDialog<void>(
++      context: context,
++      builder: (dialogContext) => AlertDialog(
++        title: const Text(
++          'APPROBATION ODOO REQUISE',
++          style: TextStyle(color: _blue, fontWeight: FontWeight.w900),
++        ),
++        content: Text(
++          'Commande ${_text(data['orderNumber'])} : aucune approbation '
++          'ni activation enregistrée. Le circuit commercial SPHOT ADMIN '
++          'exige un engagement public contrôlé ou le paiement Odoo/Stripe '
++          'vérifié côté serveur.',
++        ),
++        actions: [
++          TextButton(
++            onPressed: () => Navigator.of(dialogContext).pop(),
++            child: const Text('FERMER'),
++          ),
++        ],
++      ),
++    );
++  }
++
+   String _documentRubricKey(Map<String, dynamic> data) {
+     final subcategory = _text(data['subcategory']).toLowerCase();
+     final type = _text(data['documentType']).toLowerCase();

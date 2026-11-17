@@ -1,0 +1,62 @@
+--- a/functions/local/odoo_admin_card_test_status_readonly.js
++++ b/functions/local/odoo_admin_card_test_status_readonly.js
+@@ -42,6 +42,14 @@
+   const admin = data(adminSnap);
+   const request = data(requestSnap);
+   const active = Boolean(cycle);
++  // Les premiers cycles C4 TEST ont été écrits par set(..., {merge:true})
++  // avec une clé littérale contenant un point. Préserver ce format existant
++  // sans jamais accepter deux références contradictoires.
++  const trackingRefs = [request?.commercialTracking?.odooAdminCycleRef,
++    request?.["commercialTracking.odooAdminCycleRef"]]
++      .filter((value) => value !== undefined);
++  const trackingVerified = trackingRefs.length > 0 &&
++    trackingRefs.every((value) => value === prepared.reference);
+   if (active) {
+     if (status.paymentStatus !== "paid" ||
+         status.stripeVerified !== true ||
+@@ -61,7 +69,7 @@
+         admin?.diffusionAccessGranted !== true ||
+         admin?.odooAdminCycleRef !== prepared.reference ||
+         request?.accessPhase !== "subscription_active" ||
+-        request?.commercialTracking?.odooAdminCycleRef !== prepared.reference) {
++        !trackingVerified) {
+       throw refused("ACTIVATION_EVIDENCE_INCONSISTENT");
+     }
+   } else if (subscription?.status === "active" ||
+--- a/functions/test/odoo_admin_card_test_status_readonly.test.js
++++ b/functions/test/odoo_admin_card_test_status_readonly.test.js
+@@ -102,6 +102,33 @@
+   assert.equal(h.calls.some(([name]) => name === "verifiedStripePayment"), false);
+ });
+ 
++test("CARTE UI : ancien historique Firestore au format point accepté", async () => {
++  const h = harness({activated: true, paid: true});
++  const request = h.docs.get("adminRequests/" + UID);
++  delete request.commercialTracking;
++  request["commercialTracking.odooAdminCycleRef"] = prepared.reference;
++  const result = await h.read();
++  assert.equal(result.activationVerified, true);
++  assert.equal(result.nextGate, "TEST_CYCLE_COMPLETE");
++});
++
++test("CARTE UI : historique absent ou références contradictoires refusés", async () => {
++  const missing = harness({activated: true, paid: true});
++  delete missing.docs.get("adminRequests/" + UID).commercialTracking;
++  await assert.rejects(missing.read(), /ACTIVATION_EVIDENCE_INCONSISTENT/);
++
++  const conflicting = harness({activated: true, paid: true});
++  conflicting.docs.get("adminRequests/" + UID)
++      ["commercialTracking.odooAdminCycleRef"] = "ANOTHER_CYCLE";
++  await assert.rejects(conflicting.read(), /ACTIVATION_EVIDENCE_INCONSISTENT/);
++
++  const wrongFlat = harness({activated: true, paid: true});
++  const request = wrongFlat.docs.get("adminRequests/" + UID);
++  delete request.commercialTracking;
++  request["commercialTracking.odooAdminCycleRef"] = "ANOTHER_CYCLE";
++  await assert.rejects(wrongFlat.read(), /ACTIVATION_EVIDENCE_INCONSISTENT/);
++});
++
+ test("CARTE UI : activation artificielle, droits orphelins et PROD refusés", async () => {
+   const unpaid = harness({activated: true, paid: false});
+   await assert.rejects(unpaid.read(), /ACTIVATION_EVIDENCE_INCONSISTENT/);
