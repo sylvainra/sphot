@@ -28,10 +28,15 @@ class ProfessionalLegalGate extends StatefulWidget {
     super.key,
     required this.audience,
     required this.child,
+    this.lockedDashboard,
   });
 
   final ProfessionalLegalAudience audience;
   final Widget child;
+
+  /// Décor réel du dashboard Admin pendant le verrou juridique.
+  /// Le parcours PUBLICITAIRE n'utilise pas cette propriété.
+  final Widget? lockedDashboard;
 
   @override
   State<ProfessionalLegalGate> createState() =>
@@ -47,7 +52,7 @@ class _ProfessionalLegalGateState extends State<ProfessionalLegalGate> {
     bool loading = false,
   }) {
     return AdminLegalOverlay(
-      dashboard: widget.child,
+      dashboard: widget.lockedDashboard ?? widget.child,
       fullHeight: false,
       panel: AdminLegalStatusPanel(
         title: title,
@@ -155,6 +160,9 @@ class _ProfessionalLegalGateState extends State<ProfessionalLegalGate> {
               .map((part) => Map<String, dynamic>.from(part))
               .toList(),
           child: widget.child,
+          lockedDashboard: widget.audience == ProfessionalLegalAudience.admin
+              ? widget.lockedDashboard
+              : null,
         );
       },
     );
@@ -169,6 +177,7 @@ class _PublishedProfessionalLegalGate extends StatefulWidget {
     required this.versionId,
     required this.chapters,
     required this.child,
+    this.lockedDashboard,
   });
 
   final String documentId;
@@ -176,6 +185,7 @@ class _PublishedProfessionalLegalGate extends StatefulWidget {
   final String versionId;
   final List<Map<String, dynamic>> chapters;
   final Widget child;
+  final Widget? lockedDashboard;
 
   @override
   State<_PublishedProfessionalLegalGate> createState() =>
@@ -529,7 +539,7 @@ class _PublishedProfessionalLegalGateState
             : _adminAcceptancePanel();
 
     return AdminLegalOverlay(
-      dashboard: widget.child,
+      dashboard: widget.lockedDashboard ?? widget.child,
       fullHeight: !_loading && _error == null,
       panel: status,
     );
