@@ -18,7 +18,7 @@ const path = require("node:path");
 const cp = require("node:child_process");
 
 const BASE = "5580e2278bdfbea5521335960644f6c73d393ed6";
-const FEATURE = "f876d4f00011e4e74f562898ffd6989e548eabf3";
+const FEATURE = "285602dac43eff8a22e868bef89bf84808960eef";
 const TARGET = "functions/index.js";
 const AUXILIARY = [
   "functions/sauveteur_stats_support.js",
@@ -73,6 +73,47 @@ function safeScopedMerge(local, base, feature) {
         "Insertion ambiguë : " + label);
     return source.replace(before + after, before + will + after);
   }
+  // La seule variante locale explicitement diagnostiquée et autorisée.
+  function knownLocalStatsVariant(here, original) {
+    const guardStart =
+        '        const spotId = (request.body.spotId || "").toString().trim();\n\n';
+    const guardEnd = '          response.status(403).json({';
+    const oldGuard =
+        '        if (!context.assignedSpotIds.includes(spotId) ||\n' +
+        '            !(await supervisedSpotIds(\n' +
+        '                admin.firestore(), context.territoireId, [spotId]))\n' +
+        '                .includes(spotId)) {\n';
+    const localGuard =
+        '        if (!context.realtimeSpotIds.includes(spotId)) {\n';
+    const queryStart = '        let entriesQuery = admin.firestore()';
+    const baseQueryStart =
+        '        const bounds = mainCouranteReadBounds(request.body);';
+    const queryEnd = '        const canSeeRestricted =';
+    const knownQuery = "        let entriesQuery = admin.firestore()\n            .collection(\"territoires\")\n            .doc(context.territoireId)\n            .collection(\"spots\")\n            .doc(spotId)\n            .collection(\"mainCourante\");\n\n        const dayStartMillis = Number(request.body.dayStartMillis);\n        const dayEndMillis = Number(request.body.dayEndMillis);\n        if (Number.isFinite(dayStartMillis) &&\n            Number.isFinite(dayEndMillis) &&\n            dayEndMillis > dayStartMillis) {\n          entriesQuery = entriesQuery\n              .where(\n                  \"occurredAt\",\n                  \">=\",\n                  admin.firestore.Timestamp.fromMillis(dayStartMillis),\n              )\n              .where(\n                  \"occurredAt\",\n                  \"<\",\n                  admin.firestore.Timestamp.fromMillis(dayEndMillis),\n              );\n        }\n\n        const snapshot = await entriesQuery\n            .orderBy(\"occurredAt\", \"desc\")\n            .limit(500)\n            .get();\n\n";
+    function span(text, first, last) {
+      const a = text.indexOf(first);
+      if (a < 0 || text.indexOf(first, a + first.length) >= 0) return null;
+      const b = text.indexOf(last, a + first.length);
+      return b < 0 ? null : {a, b, value: text.slice(a, b)};
+    }
+    const bGuard = span(original, guardStart, guardEnd);
+    const lGuard = span(here, guardStart, guardEnd);
+    if (!bGuard || !lGuard ||
+        bGuard.value !== guardStart + oldGuard ||
+        lGuard.value !== guardStart + localGuard) return false;
+    const bQuery = span(original, baseQueryStart, queryEnd);
+    const lQuery = span(here, queryStart, queryEnd);
+    if (!bQuery || !lQuery ||
+        lQuery.value.replace(/\s+/g, "") !==
+        knownQuery.replace(/\s+/g, "")) return false;
+    const authBack = here.slice(0, lGuard.a) + bGuard.value +
+        here.slice(lGuard.b);
+    const queryBack = span(authBack, queryStart, queryEnd);
+    if (!queryBack) return false;
+    return authBack.slice(0, queryBack.a) + bQuery.value +
+        authBack.slice(queryBack.b) === original;
+  }
+
   function apply(src) {
     let result = src;
     const from = "exports.getSauveteurStats = onRequest(";
@@ -81,8 +122,10 @@ function safeScopedMerge(local, base, feature) {
     const incoming = part(feature, from, until, "statistiques cible");
     const existing = part(result, from, until, "statistiques locales");
     if (existing.body !== incoming.body) {
-      assert(existing.body === original.body,
-          "getSauveteurStats a été modifiée localement : arrêt sans écrasement");
+      assert(existing.body === original.body ||
+          knownLocalStatsVariant(existing.body, original.body),
+      "getSauveteurStats contient d'autres modifications locales : " +
+      "arrêt sécurisé sans écrasement");
       result = result.slice(0, existing.a) + incoming.body +
           result.slice(existing.b);
     }
@@ -188,6 +231,7 @@ function run() {
     "searchCaseId: automaticNotificationMainCourante.searchCaseId",
     "const seasonPeriods = seasonPeriodsForStation({",
     "pageQuery = pageQuery.startAfter(cursor);",
+    "context.realtimeSpotIds.includes(spotId)",
     "context.canManageRestrictedOperationalData",
     "searchCaseId: entry.searchCaseId ||",
     "          seasonPeriods,",
