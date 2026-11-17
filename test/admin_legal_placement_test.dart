@@ -81,6 +81,64 @@ void main() {
     expect(dashboard.contains('_buildDashboardContent(context)'), isTrue);
   });
 
+  test('Le verrou affiche la vraie carte et les étapes Admin '
+      'sans attendre les collections Firestore', () {
+    final dashboard = File('lib/web/admin/pages/admin_dashboard_page.dart')
+        .readAsStringSync();
+    final begin = dashboard.indexOf(
+      'Widget _buildLockedLegalDashboardBackdrop() {',
+    );
+    final end = dashboard.indexOf(
+      '// Le contrôle réutilise les CGU ADMIN publiées',
+      begin,
+    );
+    expect(begin, greaterThan(0));
+    expect(end, greaterThan(begin));
+    final backdrop = dashboard.substring(begin, end);
+    // Réutilise le panneau réel de l'Admin : aucune seconde liste factice.
+    expect(backdrop.contains('_buildRightPanel('), isTrue);
+    expect(backdrop.contains('FlutterMap('), isTrue);
+    expect(backdrop.contains('TileLayer('), isTrue);
+    expect(backdrop.contains('_tileStyles[_selectedTileStyle]'), isTrue);
+    expect(backdrop.contains('_territoryCenter'), isTrue);
+    expect(backdrop.contains('StreamBuilder('), isFalse);
+    expect(backdrop.contains('_spotsStream'), isFalse);
+    expect(
+      dashboard.contains(
+        'lockedBackground: _buildLockedLegalDashboardBackdrop()',
+      ),
+      isTrue,
+    );
+    // Après l'acceptation, le vrai dashboard chargé reste inchangé.
+    expect(dashboard.contains('child: _buildDashboardContent(context)'),
+        isTrue);
+    for (final title in [
+      'CRÉER UN SPHOT',
+      'CRÉER UNE PÉRIODE',
+      'CRÉER UN SAUVETEUR',
+      'ESPACE SPHOT ADMIN',
+      'ESSAI GRATUIT 8 JOURS',
+    ]) {
+      expect(dashboard.contains(title), isTrue, reason: title);
+    }
+  });
+
+  test('Le décor de verrouillage est limité au profil ADMIN', () {
+    final gate = File('lib/web/shared/professional_legal_gate.dart')
+        .readAsStringSync();
+    expect(gate.contains('final Widget? lockedBackground;'), isTrue);
+    expect(
+      'dashboard: widget.lockedBackground ?? widget.child'
+          .allMatches(gate).length,
+      2,
+    );
+    expect(gate.contains("if (widget.documentId == 'adminCgu')"),
+        isTrue);
+    // La branche PUBLICITAIRE garde ses composants et n'utilise pas le décor.
+    expect(gate.contains("backgroundColor: const Color(0xFFF3F6FA)"),
+        isTrue);
+  });
+
   testWidgets('La carte et les cinq étapes Admin restent visibles '
       'mais non interactives avant acceptation', (tester) async {
     var backgroundClicks = 0;
