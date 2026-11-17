@@ -80,7 +80,8 @@ test("le bilan n'inclut pas une saison d'une autre année", () => {
   ]);
 });
 
-test("les statistiques conservent les protections et suppriment le plafond 500", () => {
+test("les statistiques conservent les protections et suppriment le " +
+    "plafond 500", () => {
   const backend = read("functions/index.js");
   const start = backend.indexOf("exports.getSauveteurStats =");
   const end = backend.indexOf("function sanitizeMainCouranteVictim(", start);
@@ -95,12 +96,14 @@ test("les statistiques conservent les protections et suppriment le plafond 500",
   assert.match(stats, /qualification: entry\.victim\.qualification/);
 });
 
-test("les bilans et le PDF utilisent les recherches distinctes par périmètre", () => {
+test("les bilans et le PDF utilisent les recherches distinctes " +
+    "par périmètre", () => {
   const ui = read("lib/pages/sauveteur/sauveteur_stats_page.dart");
   assert.match(ui, /_summaryCard\(\s*title: 'BILAN MENSUEL'/);
   assert.match(ui, /title: 'BILAN SAISONNIER '/);
   assert.match(ui, /searches\.add\(caseId\.isNotEmpty/);
-  assert.match(ui, /_seasonPeriods\.any\(\(period\) => period\.contains\(key\)\)/);
+  assert.match(ui,
+      /_seasonPeriods\.any\(\(period\) => period\.contains\(key\)\)/);
   assert.match(ui, /Bilan de saison /);
   assert.match(ui, /Recherches distinctes : /);
   assert.match(ui, /_eventRow\(stats\.summary\)/);
