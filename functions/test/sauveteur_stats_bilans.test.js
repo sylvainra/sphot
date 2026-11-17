@@ -113,43 +113,43 @@ test("les faits journaliers ne répètent pas les trois compteurs", () => {
   const ui = read("lib/pages/sauveteur/sauveteur_stats_page.dart");
   const day = ui.split("Widget _dayCard(_DailyStats stats) {")[1]
       .split("Future<Uint8List> _buildPdf()")[0];
-  assert.match(day, /stats\\.facts\\.entries\\.where\\(\\(entry\\)/);
+  assert.ok(day.includes("stats.facts.entries.where((entry)"));
   for (const category of ["incident", "intervention", "personne recherchée"]) {
-    assert.match(day, new RegExp("type != '" + category + "'"));
+    assert.ok(day.includes("type != '" + category + "'"));
   }
-  assert.match(day, /if \\(stats\\.facts\\.isEmpty\\)/);
-  assert.match(day, /else if \\(factEntries\\.isNotEmpty\\)/);
-  assert.match(day, /_eventRow\\(stats\\.summary\\)/);
-  assert.match(day, /stats\\.rescueQualifications\\.isNotEmpty/);
+  assert.ok(day.includes("if (stats.facts.isEmpty)"));
+  assert.ok(day.includes("else if (factEntries.isNotEmpty)"));
+  assert.ok(day.includes("_eventRow(stats.summary)"));
+  assert.ok(day.includes("stats.rescueQualifications.isNotEmpty"));
 });
 
-test("libellés de compteurs plus grands mais adaptés à la largeur", () => {
+test("libellés des compteurs agrandis et adaptés à la largeur", () => {
   const ui = read("lib/pages/sauveteur/sauveteur_stats_page.dart");
   const count = ui.split("Widget _eventCount({")[1]
       .split("Widget _eventRow(")[0];
-  assert.match(count, /fontSize: 16/);
-  assert.match(count, /fontSize: 10\\.5/);
-  assert.match(count, /FittedBox\\(/);
-  assert.match(count, /BoxFit\\.scaleDown/);
+  for (const token of ["fontSize: 16", "fontSize: 10.5",
+    "FittedBox(", "BoxFit.scaleDown"]) {
+    assert.ok(count.includes(token));
+  }
 });
 
-test("accès rapide aux bilans tout en conservant le défilement", () => {
+test("accès rapide aux bilans conservant le défilement et PARTAGER", () => {
   const ui = read("lib/pages/sauveteur/sauveteur_stats_page.dart");
   const build = ui.split("Widget build(BuildContext context) {")[1]
       .split("class _SeasonPeriod {")[0];
-  assert.match(ui, /Scrollable\\.ensureVisible\\(/);
-  assert.match(ui, /_monthlySummaryKey\\.currentContext/);
-  assert.match(build, /'VOIR LES BILANS'/);
-  assert.match(build, /SingleChildScrollView\\(/);
-  assert.match(build, /key: _monthlySummaryKey/);
-  assert.match(build, /title: 'BILAN MENSUEL'/);
-  assert.match(build, /title: 'BILAN SAISONNIER '/);
-  assert.match(build, /'PARTAGER'/);
+  assert.ok(ui.includes("Scrollable.ensureVisible("));
+  assert.ok(ui.includes("_monthlySummaryKey.currentContext"));
+  for (const token of ["'VOIR LES BILANS'", "SingleChildScrollView(",
+    "key: _monthlySummaryKey", "title: 'BILAN MENSUEL'",
+    "title: 'BILAN SAISONNIER '", "'PARTAGER'"]) {
+    assert.ok(build.includes(token));
+  }
 });
 
-test("les mois futurs ne peuvent pas être sélectionnés", () => {
+test("la flèche suivante et le calcul bloquent les mois futurs", () => {
   const ui = read("lib/pages/sauveteur/sauveteur_stats_page.dart");
-  assert.match(ui, /bool get _canGoToNextMonth/);
-  assert.match(ui, /if \\(target\\.isAfter\\(DateTime\\(now\\.year, now\\.month\\)\\)\\)/);
-  assert.match(ui, /onPressed: _canGoToNextMonth \\?/);
+  assert.ok(ui.includes("bool get _canGoToNextMonth"));
+  assert.ok(ui.includes(
+      "if (target.isAfter(DateTime(now.year, now.month))) return;"));
+  assert.ok(ui.includes("onPressed: _canGoToNextMonth ?"));
 });
