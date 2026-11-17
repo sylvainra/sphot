@@ -6,12 +6,12 @@ const {surveillanceWindowForSauveteurs} =
 const {autoLowerClosedFlags} = require("./sauveteur_flag_auto_lower");
 const {
   mainCouranteReadBounds,
-  assignedPeriodReferences,
   parisCivilYear,
-  parisDayKey,
   loadMainCouranteLifecycle,
   purgeExpiredMainCourante,
 } = require("./sauveteur_main_courante_lifecycle");
+const {searchCaseIdForNotification, seasonPeriodsForStation} =
+    require("./sauveteur_stats_support");
 const {attachOperationalSpotTerritory} =
     require("./sauveteur_spot_territory");
 const {shouldRejectSauveteurBrowserLogin} =
@@ -7529,13 +7529,10 @@ exports.updateSauveteurLiveState = onRequest(
           // republications ; une nouvelle recherche après clôture reçoit
           // un autre identifiant. Aucun nom de victime n'est utilisé comme clé.
           if (automaticNotificationMainCourante) {
-            const previousNotification = previousSpot.notificationPublique || {};
-            const priorCaseId =
-              previousNotification.active === true &&
-              previousNotification.source === "recherche_personne" &&
-              typeof previousNotification.searchCaseId === "string" ?
-                previousNotification.searchCaseId.trim() : "";
-            const searchCaseId = priorCaseId || crypto.randomUUID();
+            const searchCaseId = searchCaseIdForNotification(
+                previousSpot.notificationPublique,
+                () => crypto.randomUUID(),
+            );
             automaticNotificationMainCourante.searchCaseId = searchCaseId;
             sanitizedChanges.notificationPublique = {
               ...sanitizedChanges.notificationPublique,
@@ -12068,34 +12065,14 @@ exports.getSauveteurStats = onRequest(
                 .doc(context.territoireId)
                 .collection("periodesSurveillance").get(),
           ]);
-        const references = assignedPeriodReferences(
-            stationSnapshot.data() || {},
-            assignedSnapshot.docs.map((doc) => doc.data() || {}),
-        );
-        const seasonPeriods = periodsSnapshot.docs
-            .filter((doc) => {
-              const data = doc.data() || {};
-              const label = (data.label || data.name || "")
-                  .toString().trim();
-              return references.has(doc.id) || references.has(label);
-            })
-            .map((doc) => {
-              const data = doc.data() || {};
-              const start = data.startDate &&
-                  typeof data.startDate.toDate === "function" ?
-                    data.startDate.toDate() : null;
-              const end = data.endDate &&
-                  typeof data.endDate.toDate === "function" ?
-                    data.endDate.toDate() : null;
-              return {
-                startDay: start ? parisDayKey(start) : 0,
-                endDay: end ? parisDayKey(end) : 0,
-              };
-            })
-            .filter((period) => period.startDay > 0 &&
-                period.endDay >= period.startDay &&
-                period.startDay <= year * 10000 + 1231 &&
-                period.endDay >= year * 10000 + 101);
+        const seasonPeriods = seasonPeriodsForStation({
+          station: stationSnapshot.data() || {},
+          assigned: assignedSnapshot.docs.map((doc) => doc.data() || {}),
+          periods: periodsSnapshot.docs.map(
+              (doc) => ({id: doc.id, ...doc.data()})),
+          year,
+        });
+
         await admin.firestore()
             .collection("mainCouranteAccessLogs")
             .add({
