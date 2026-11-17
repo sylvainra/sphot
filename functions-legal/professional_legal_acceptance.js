@@ -88,7 +88,9 @@ async function adminChangeHistory(db, current, recorded, versionId) {
     history.doc(root + "_published").get(),
     history.doc(root + "_legacy").get(),
   ]);
-  const candidates = [published.data(), legacy.data()];
+  // La copie "legacy" fige la publication immediatement precedente ; elle
+  // prime sur un eventuel ancien enregistrement "published" de meme revision.
+  const candidates = [legacy.data(), published.data()];
   const previous = candidates.find((data) =>
     data?.documentId === "adminCgu" &&
     data?.revision === baselineRevision &&
