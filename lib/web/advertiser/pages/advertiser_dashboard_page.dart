@@ -736,13 +736,14 @@ _detailScrollController.dispose();
   @override
   Widget build(BuildContext context) {
     final dashboard = _buildDashboardContent(context);
-    // Les candidats annonceurs non encore approuvés conservent leur
-    // parcours d'inscription. Le portail commercial approuvé exige
-    // une acceptation à jour des CGU PUBLICITAIRE.
-    if (!widget.approvedAccess) return dashboard;
+    // Le parcours de candidature reste inchangé. Pour toute demande
+    // effectivement approuvée, le contrôle CGU s'affiche sur le véritable
+    // dashboard Publicitaire et le verrouille jusqu'à acceptation.
+    if (!_approvedFlow) return dashboard;
     return ProfessionalLegalGate(
       audience: ProfessionalLegalAudience.advertiser,
       child: dashboard,
+      lockedDashboard: dashboard,
     );
   }
 
