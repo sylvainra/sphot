@@ -144,6 +144,31 @@ le statut du merge et les tests, puis effectuer un déploiement strictement
 limité aux deux fonctions indiquées ci-dessus. Ne jamais déployer
 `functions` entier, les règles Firestore ou le hosting dans ce chantier.
 
+## Contrôles locaux du 17/11/2026 — non-régression restant à traiter
+
+Après la fusion STATS sur le poste Windows, le test de cycle de vie a produit
+**18 réussites sur 19**. L'unique échec est l'assertion statique
+`context.assignedSpotIds.includes(spotId)` dans
+`functions/test/sauveteur_main_courante_lifecycle.test.js`.
+La fonction locale `getSauveteurMainCourante` utilise
+`context.realtimeSpotIds` et interdit la consultation lorsque
+`context.sphotMode !== "ON"`. Elle lit aussi avec `.limit(100)`
+sans la borne civile `mainCouranteReadBounds` attendue par le test.
+Il serait trompeur de modifier uniquement l'assertion :
+la consultation OFF et le filtrage des années sont des différences
+fonctionnelles à examiner séparément sans affaiblir les autorisations.
+
+Le lint général échoue sur **641 erreurs** dans des tests Odoo locaux
+non inclus dans la branche STATS ; ne pas exécuter de `eslint --fix`
+global ni déployer avant vérification des impacts et des dépendances.
+L'utilitaire STATS a été renforcé pour garantir la présence du
+`require` de `mainCouranteReadBounds` même si la version locale avait
+supprimé ou réorganisé les imports historiques. Le précontrôle Windows
+doit être renouvelé pour prendre cette correction en compte.
+
+Aucun de ces constats ne vaut autorisation d'un déploiement Firebase ;
+le backend n'est pas déployé depuis ce chantier.
+
 ## Vérifications indispensables après raccordement
 
 1. Sur l'émulateur sauveteur connecté, ouvrir STATS, cliquer « VOIR LES
