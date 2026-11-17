@@ -114,6 +114,53 @@ function safeScopedMerge(local, base, feature) {
         authBack.slice(queryBack.b) === original;
   }
 
+
+  // Variante batch non transactionnelle du poste sauveteur, diagnostiquée
+  // localement. Conserver son flux ; intégrer seulement les deux champs ID.
+  function patchLocalBatch(live) {
+    const read =
+        "        const spotSnapshot = await spotReference.get();\n" +
+        "        const previousSpot = spotSnapshot.data() || {};\n";
+    const next =
+        "        const previousLiveFlag = previousSpot.liveFlag || {};\n";
+    const source =
+        '            source: "automatic_person_search_publication",\n';
+    const msg = "            publicNotificationMessage:\n";
+    const create =
+        "        if (automaticNotificationMainCourante) {\n" +
+        "          const searchCaseId = searchCaseIdForNotification(\n" +
+        "              previousSpot.notificationPublique,\n" +
+        "              () => crypto.randomUUID(),\n" +
+        "          );\n" +
+        "          automaticNotificationMainCourante.searchCaseId = " +
+            "searchCaseId;\n" +
+        "          sanitizedChanges.notificationPublique = {\n" +
+        "            ...sanitizedChanges.notificationPublique,\n" +
+        '            source: "recherche_personne",\n' +
+        "            searchCaseId,\n" +
+        "          };\n" +
+        "        }\n";
+    const field =
+        "            searchCaseId: " +
+          "automaticNotificationMainCourante.searchCaseId,\n";
+    const count = (text, needle) => text.split(needle).length - 1;
+    const before = live.includes(read + next) &&
+        live.includes(source + msg);
+    const after = live.includes(read + create + next) &&
+        live.includes(source + field + msg);
+    assert(!live.includes("runTransaction") &&
+        live.includes("        const db = admin.firestore();") &&
+        live.includes('db.collection("spots").doc(spotId)') &&
+        live.includes("await batch.commit();") &&
+        live.includes("sanitizedChanges.notificationPublique") &&
+        (before || after) &&
+        count(live, read) === 1 && count(live, source) === 1,
+    "Publication batch différente du diagnostic : arrêt sans écrasement");
+    if (after) return live;
+    return live.replace(read + next, read + create + next)
+        .replace(source + msg, source + field + msg);
+  }
+
   function apply(src) {
     let result = src;
     const from = "exports.getSauveteurStats = onRequest(";
@@ -135,14 +182,20 @@ function safeScopedMerge(local, base, feature) {
     const oldLive = part(base, liveStart, liveEnd, "live origine");
     const newLive = part(feature, liveStart, liveEnd, "live cible");
     const localLive = part(result, liveStart, liveEnd, "live local");
-    let updated = insert(localLive.body, oldLive.body, newLive.body,
-        "          const previousSpot = spotSnapshot.data() || {};\n",
-        "          const operationalTerritoryId =",
-        "l'identifiant de la recherche");
-    updated = insert(updated, oldLive.body, newLive.body,
-        '              source: "automatic_person_search_publication",\n',
-        "              publicNotificationMessage:",
-        "le journal des recherches");
+    let updated;
+    if (localLive.body.includes(
+        "        const spotSnapshot = await spotReference.get();")) {
+      updated = patchLocalBatch(localLive.body);
+    } else {
+      updated = insert(localLive.body, oldLive.body, newLive.body,
+          "          const previousSpot = spotSnapshot.data() || {};\n",
+          "          const operationalTerritoryId =",
+          "l'identifiant de la recherche");
+      updated = insert(updated, oldLive.body, newLive.body,
+          '              source: "automatic_person_search_publication",\n',
+          "              publicNotificationMessage:",
+          "le journal des recherches");
+    }
     result = result.slice(0, localLive.a) + updated + result.slice(localLive.b);
 
     const yearAnchor = "  mainCouranteReadBounds,\n";
