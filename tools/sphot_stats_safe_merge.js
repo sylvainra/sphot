@@ -200,14 +200,47 @@ function safeScopedMerge(local, base, feature) {
 
     const yearAnchor = "  mainCouranteReadBounds,\n";
     const yearLine = "  parisCivilYear,\n";
+    const yearStandalone =
+        'const {parisCivilYear} = ' +
+        'require("./sauveteur_main_courante_lifecycle");\n';
     assert(feature.includes(yearAnchor + yearLine) &&
         !base.includes(yearAnchor + yearLine),
     "Import de l'année civile non confirmé");
-    if (!result.includes(yearAnchor + yearLine)) {
-      assert(result.split(yearAnchor).length === 2,
-          "Import mainCouranteReadBounds ambigu");
-      result = result.replace(yearAnchor, yearAnchor + yearLine);
+
+    // Determine the *specific* lifecycle require block, never rely on a
+    // repeated token elsewhere in index.js (e.g. another import or export).
+    const lifecycleImports = Array.from(result.matchAll(
+        /const\s*\{([^}]*)\}\s*=\s*require\(["']\.\/sauveteur_main_courante_lifecycle["']\);/g,
+    ));
+    const yearImported = lifecycleImports.some((m) =>
+      /(?:^|,)\s*parisCivilYear\s*(?:,|$)/.test(m[1]));
+    if (!yearImported) {
+      assert(!/\b(?:const|let|var|function|class)\s+parisCivilYear\b/.test(
+          result), "parisCivilYear existe déjà hors import connu");
+      const withBounds = lifecycleImports.find((m) =>
+        /(?:^|,)\s*mainCouranteReadBounds\s*(?:,|$)/.test(m[1]));
+      if (withBounds) {
+        assert(lifecycleImports.length === 1 &&
+            withBounds[0].includes(yearAnchor),
+        "Import lifecycle ambigu : examen manuel nécessaire");
+        const nextImport = withBounds[0].replace(
+            yearAnchor, yearAnchor + yearLine);
+        result = result.replace(withBounds[0], nextImport);
+      } else if (lifecycleImports.length === 1) {
+        // Keep the local import untouched; add a separate, equivalent require.
+        result = result.replace(
+            lifecycleImports[0][0],
+            lifecycleImports[0][0] + "\n" + yearStandalone.trimEnd());
+      } else {
+        assert(lifecycleImports.length === 0,
+            "Plusieurs imports lifecycle locaux : examen manuel");
+        const strict = result.match(/^(?:"use strict"|'use strict');\n/);
+        const at = strict ? strict[0].length : 0;
+        result = result.slice(0, at) + yearStandalone +
+            result.slice(at);
+      }
     }
+
     const helperAnchor =
         '} = require("./sauveteur_main_courante_lifecycle");\n';
     const helper =
@@ -215,10 +248,21 @@ function safeScopedMerge(local, base, feature) {
         '    require("./sauveteur_stats_support");\n';
     assert(feature.includes(helperAnchor + helper) &&
         !base.includes(helper), "Import du helper non confirmé");
-    if (!result.includes(helper)) {
-      assert(result.split(helperAnchor).length === 2,
-          "Ancre du helper ambiguë");
+    const helperImports = Array.from(result.matchAll(
+        /const\s*\{([^}]*)\}\s*=\s*require\(["']\.\/sauveteur_stats_support["']\);/g,
+    ));
+    if (helperImports.length) {
+      assert(helperImports.length === 1 &&
+          /\bsearchCaseIdForNotification\b/.test(helperImports[0][1]) &&
+          /\bseasonPeriodsForStation\b/.test(helperImports[0][1]),
+      "Un autre import du helper STATS existe : contrôle manuel nécessaire");
+    } else if (result.split(helperAnchor).length === 2) {
       result = result.replace(helperAnchor, helperAnchor + helper);
+    } else {
+      // Some local versions do not use a destructured lifecycle import.
+      const strict = result.match(/^(?:"use strict"|'use strict');\n/);
+      const at = strict ? strict[0].length : 0;
+      result = result.slice(0, at) + helper + result.slice(at);
     }
     return result;
   }
