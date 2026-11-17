@@ -6,6 +6,9 @@ const {surveillanceWindowForSauveteurs} =
 const {autoLowerClosedFlags} = require("./sauveteur_flag_auto_lower");
 const {
   mainCouranteReadBounds,
+  assignedPeriodReferences,
+  parisCivilYear,
+  parisDayKey,
   loadMainCouranteLifecycle,
   purgeExpiredMainCourante,
 } = require("./sauveteur_main_courante_lifecycle");
@@ -7522,6 +7525,24 @@ exports.updateSauveteurLiveState = onRequest(
         const outcome = await db.runTransaction(async (transaction) => {
           const spotSnapshot = await transaction.get(spotReference);
           const previousSpot = spotSnapshot.data() || {};
+          // Une recherche active conserve son identifiant lors des
+          // republications ; une nouvelle recherche après clôture reçoit
+          // un autre identifiant. Aucun nom de victime n'est utilisé comme clé.
+          if (automaticNotificationMainCourante) {
+            const previousNotification = previousSpot.notificationPublique || {};
+            const priorCaseId =
+              previousNotification.active === true &&
+              previousNotification.source === "recherche_personne" &&
+              typeof previousNotification.searchCaseId === "string" ?
+                previousNotification.searchCaseId.trim() : "";
+            const searchCaseId = priorCaseId || crypto.randomUUID();
+            automaticNotificationMainCourante.searchCaseId = searchCaseId;
+            sanitizedChanges.notificationPublique = {
+              ...sanitizedChanges.notificationPublique,
+              source: "recherche_personne",
+              searchCaseId,
+            };
+          }
           const operationalTerritoryId =
               (previousSpot.territoireId || "").toString().trim();
           if (operationalTerritoryId &&
@@ -7759,6 +7780,7 @@ exports.updateSauveteurLiveState = onRequest(
                 role: context.userRole,
               },
               source: "automatic_person_search_publication",
+              searchCaseId: automaticNotificationMainCourante.searchCaseId,
               publicNotificationMessage:
                 automaticNotificationMainCourante.publicMessage,
               immutableOriginal: true,
@@ -11972,11 +11994,12 @@ exports.getSauveteurStats = onRequest(
         }
 
         const bounds = mainCouranteReadBounds(request.body);
-        const entriesQuery = admin.firestore()
+        const stationReference = admin.firestore()
             .collection("territoires")
             .doc(context.territoireId)
             .collection("spots")
-            .doc(spotId)
+            .doc(spotId);
+        const entriesQuery = stationReference
             .collection("mainCourante")
             .where(
                 "occurredAt", ">=",
@@ -11986,15 +12009,30 @@ exports.getSauveteurStats = onRequest(
                 "occurredAt", "<",
                 admin.firestore.Timestamp.fromMillis(bounds.until),
             );
-        const snapshot = bounds.empty ? {docs: []} : await entriesQuery
-            .orderBy("occurredAt", "desc")
-            .limit(500)
-            .get();
+
+        // Le plafond historique de 500 faits tronquait les bilans mensuels.
+        // Parcours paginé de tous les faits (ordre stable par document).
+        const documents = [];
+        if (!bounds.empty) {
+          let cursor = null;
+          for (;;) {
+            let pageQuery = entriesQuery
+                .orderBy("occurredAt", "desc")
+                .limit(500);
+            if (cursor) pageQuery = pageQuery.startAfter(cursor);
+            const page = await pageQuery.get();
+            documents.push(...page.docs);
+            if (page.docs.length < 500) break;
+            cursor = page.docs[page.docs.length - 1];
+          }
+        }
 
         const canSeeRestricted =
           context.canManageRestrictedOperationalData;
 
-        const entries = snapshot.docs
+        // Seules les données nécessaires aux statistiques sont transmises :
+        // jamais les identités, coordonnées ou récits des victimes.
+        const entries = documents
             .map((document) => {
               const data = document.data() || {};
               return {id: document.id, ...data};
@@ -12005,28 +12043,60 @@ exports.getSauveteurStats = onRequest(
             .map((entry) => ({
               id: entry.id,
               type: entry.type || "Observation",
-              description: entry.description || "",
-              actionTaken: entry.actionTaken || "",
-              visibility: entry.visibility || "operational",
+              description:
+                (entry.type || "").toString().trim().toLowerCase() ===
+                  "drapeau" ? entry.description || "" : "",
               victim: entry.victim && typeof entry.victim === "object" ?
-                entry.victim : null,
-              interventionZones:
-                sanitizeMainCouranteInterventionZones(
-                    entry.interventionZones,
-                ),
-              presencePersonnel:
-                sanitizeMainCourantePresencePersonnel(
-                    entry.presencePersonnel,
-                ),
-              source: entry.source || "",
-              wasEdited: entry.wasEdited === true,
+                {qualification: entry.victim.qualification || ""} : null,
+              searchCaseId: entry.searchCaseId || "",
               occurredAt: entry.occurredAt &&
-                  typeof entry.occurredAt.toMillis === "function" ?
+                typeof entry.occurredAt.toMillis === "function" ?
                 entry.occurredAt.toMillis() : null,
-              createdBy: entry.createdBy || {},
             }));
 
-        await admin.firestore()
+        // Une saison = union des périodes affectées au poste pour l'année,
+        // y compris lorsque ces périodes sont discontinues ou se chevauchent.
+        const requestedYear = Number(request.body.statsYear);
+        const year = Number.isInteger(requestedYear) &&
+            requestedYear >= 2000 && requestedYear <= 2100 ?
+              requestedYear : parisCivilYear().year;
+        const [stationSnapshot, assignedSnapshot, periodsSnapshot] =
+          await Promise.all([
+            stationReference.get(),
+            stationReference.collection("sauveteursAffectes").get(),
+            admin.firestore().collection("territoires")
+                .doc(context.territoireId)
+                .collection("periodesSurveillance").get(),
+          ]);
+        const references = assignedPeriodReferences(
+            stationSnapshot.data() || {},
+            assignedSnapshot.docs.map((doc) => doc.data() || {}),
+        );
+        const seasonPeriods = periodsSnapshot.docs
+            .filter((doc) => {
+              const data = doc.data() || {};
+              const label = (data.label || data.name || "")
+                  .toString().trim();
+              return references.has(doc.id) || references.has(label);
+            })
+            .map((doc) => {
+              const data = doc.data() || {};
+              const start = data.startDate &&
+                  typeof data.startDate.toDate === "function" ?
+                    data.startDate.toDate() : null;
+              const end = data.endDate &&
+                  typeof data.endDate.toDate === "function" ?
+                    data.endDate.toDate() : null;
+              return {
+                startDay: start ? parisDayKey(start) : 0,
+                endDay: end ? parisDayKey(end) : 0,
+              };
+            })
+            .filter((period) => period.startDay > 0 &&
+                period.endDay >= period.startDay &&
+                period.startDay <= year * 10000 + 1231 &&
+                period.endDay >= year * 10000 + 101);
+                await admin.firestore()
             .collection("mainCouranteAccessLogs")
             .add({
               territoireId: context.territoireId,
@@ -12042,6 +12112,7 @@ exports.getSauveteurStats = onRequest(
         response.status(200).json({
           success: true,
           entries,
+          seasonPeriods,
         });
       } catch (error) {
         console.error("Erreur lecture statistiques sauveteur:", error);
