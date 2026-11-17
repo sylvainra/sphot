@@ -50,7 +50,7 @@ class AdminLegalOverlay extends StatelessWidget {
                       ? (heightLimit > 630 ? 630.0 : heightLimit)
                       : (heightLimit > 270 ? 270.0 : heightLimit);
                   return Align(
-                    alignment: Alignment.centerRight,
+                    alignment: Alignment.center,
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 620),
                       child: SizedBox(
