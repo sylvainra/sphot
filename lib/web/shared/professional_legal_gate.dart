@@ -204,6 +204,7 @@ class _PublishedProfessionalLegalGateState
   bool _acknowledged = false;
   bool _adminShowFullDocument = false;
   Map<String, dynamic>? _adminChanges;
+  Map<String, dynamic>? _advertiserChanges;
   String? _error;
 
   @override
@@ -266,6 +267,10 @@ class _PublishedProfessionalLegalGateState
                 result['adminChanges'] is Map
             ? Map<String, dynamic>.from(result['adminChanges'] as Map)
             : null;
+        _advertiserChanges = widget.documentId == 'advertiserCgu' &&
+                result['advertiserChanges'] is Map
+            ? Map<String, dynamic>.from(result['advertiserChanges'] as Map)
+            : null;
         _adminShowFullDocument = false;
         _loading = false;
       });
@@ -318,6 +323,13 @@ class _PublishedProfessionalLegalGateState
         .map((row) => Map<String, dynamic>.from(row)).toList();
   }
 
+  List<Map<String, dynamic>> get _advertiserModifiedArticles {
+    final rows = _advertiserChanges?['articles'];
+    if (rows is! List) return <Map<String, dynamic>>[];
+    return rows.whereType<Map>()
+        .map((row) => Map<String, dynamic>.from(row)).toList();
+  }
+
   Widget _adminChangedArticle(Map<String, dynamic> article) {
     const blue = Color(0xFF213F8E);
     const purple = Color(0xFF6544A8);
@@ -331,7 +343,9 @@ class _PublishedProfessionalLegalGateState
       margin: const EdgeInsets.only(bottom: 9),
       color: const Color(0xFFF7F8FC),
       child: ExpansionTile(
-        initiallyExpanded: _adminModifiedArticles.length <= 3,
+        initiallyExpanded: (widget.documentId == 'adminCgu'
+            ? _adminModifiedArticles.length
+            : _advertiserModifiedArticles.length) <= 3,
         title: Text('Article $id — $title',
           style: const TextStyle(color: blue, fontSize: 13,
             fontWeight: FontWeight.w800)),
@@ -381,14 +395,16 @@ class _PublishedProfessionalLegalGateState
     );
   }
 
-  Widget _adminAcceptancePanel() {
+  Widget _adminAcceptancePanel({bool advertiser = false}) {
     const blue = Color(0xFF213F8E);
     const purple = Color(0xFF6544A8);
-    final changes = _adminModifiedArticles;
+    final changeData = advertiser ? _advertiserChanges : _adminChanges;
+    final changes =
+        advertiser ? _advertiserModifiedArticles : _adminModifiedArticles;
     final targeted = changes.isNotEmpty;
-    final oldVersion = (_adminChanges?['baselineVersionId'] ?? '').toString();
+    final oldVersion = (changeData?['baselineVersionId'] ?? '').toString();
     final acceptedBaseline =
-        _adminChanges?['baselineKind'] == 'lastAccepted';
+        changeData?['baselineKind'] == 'lastAccepted';
     final full = _adminShowFullDocument || !targeted;
 
     return Column(
@@ -407,9 +423,9 @@ class _PublishedProfessionalLegalGateState
               Expanded(child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('MODIFICATIONS DES CGU SPHOT ADMIN',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900,
-                      color: Colors.white)),
+                  Text('MODIFICATIONS DES CGU ${widget.displayName}',
+                    style: const TextStyle(fontSize: 15,
+                      fontWeight: FontWeight.w900, color: Colors.white)),
                   const SizedBox(height: 3),
                   Text('Version publiée ${widget.versionId}',
                     style: const TextStyle(fontSize: 12,
@@ -491,7 +507,7 @@ class _PublishedProfessionalLegalGateState
                 onChanged: _submitting ? null : (value) =>
                   setState(() => _acknowledged = value ?? false),
                 title: Text('J’ai pris connaissance des modifications et '
-                    'j’accepte l’intégralité des CGU SPHOT ADMIN, '
+                    'j’accepte l’intégralité des CGU ${widget.displayName}, '
                     'version ${widget.versionId}.',
                   style: const TextStyle(color: blue, fontSize: 12,
                     fontWeight: FontWeight.w600)),
@@ -521,10 +537,10 @@ class _PublishedProfessionalLegalGateState
     );
   }
 
-  Widget _adminLockedDashboard() {
+  Widget _adminLockedDashboard({bool advertiser = false}) {
     final status = _loading
         ? AdminLegalStatusPanel(
-            title: 'Vérification des CGU SPHOT ADMIN',
+            title: 'Vérification des CGU ${widget.displayName}',
             detail: 'Chargement de votre acceptation…',
             loading: true,
             onSignOut: () => _leaveAdminLegalGate(context),
@@ -536,7 +552,7 @@ class _PublishedProfessionalLegalGateState
                 onRetry: _check,
                 onSignOut: () => _leaveAdminLegalGate(context),
               )
-            : _adminAcceptancePanel();
+            : _adminAcceptancePanel(advertiser: advertiser);
 
     return AdminLegalOverlay(
       dashboard: widget.lockedDashboard ?? widget.child,
@@ -547,11 +563,15 @@ class _PublishedProfessionalLegalGateState
 
   @override
   Widget build(BuildContext context) {
-    // Seul SPHOT ADMIN change de présentation : l'annonceur conserve
-    // son écran juridique existant, sans modification de son parcours.
-    if (widget.documentId == 'adminCgu') {
+    // Les parcours professionnels approuvés partagent le même panneau
+    // juridique bloquant. Le dashboard reste visible derrière la carte et
+    // ses étapes, quel que soit le document à réaccepter.
+    if (widget.documentId == 'adminCgu' ||
+        widget.documentId == 'advertiserCgu') {
       if (!_loading && _error == null && !_required) return widget.child;
-      return _adminLockedDashboard();
+      return _adminLockedDashboard(
+        advertiser: widget.documentId == 'advertiserCgu',
+      );
     }
 
     if (_loading) {
