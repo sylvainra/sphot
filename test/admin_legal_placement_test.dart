@@ -25,16 +25,28 @@ void main() {
     expect(dashboard.contains('ProfessionalLegalAudience.advertiser'), isFalse);
   });
 
-  test('La réacceptation ADMIN ne modifie pas le portail PUBLICITAIRE', () {
+  test('Le portail PUBLICITAIRE affiche le verrou sur son dashboard approuvé', () {
     final advertiser =
         File('lib/web/advertiser/pages/advertiser_dashboard_page.dart')
             .readAsStringSync();
-    expect(
-      advertiser.contains('ProfessionalLegalAudience.advertiser'),
-      isTrue,
-    );
-    expect(advertiser.contains('if (!widget.approvedAccess) return dashboard;'),
+    expect(advertiser.contains('if (!_approvedFlow) return dashboard;'), isTrue);
+    expect(advertiser.contains('ProfessionalLegalAudience.advertiser'), isTrue);
+    expect(advertiser.contains('lockedDashboard: dashboard'), isTrue);
+    expect(advertiser.contains('Widget _buildMap('), isTrue);
+    expect(advertiser.contains('Widget _buildSidebar()'), isTrue);
+    expect(advertiser.contains('Widget _buildDetailPanel()'), isTrue);
+
+    final gate = File('lib/web/shared/professional_legal_gate.dart')
+        .readAsStringSync();
+    expect(gate.contains("result['advertiserChanges']"), isTrue);
+    expect(gate.contains('_advertiserAcceptancePanel()'), isTrue);
+    expect(gate.contains('_advertiserLockedDashboard()'), isTrue);
+    expect(gate.contains('...changes.map(_adminChangedArticle)'), isTrue);
+    expect(gate.contains('if (full)'), isTrue);
+    expect(gate.contains('CONSULTER LES'), isTrue);
+    expect(gate.contains('j’accepte l’intégralité des CGU SPHOT PUBLICITAIRE'),
         isTrue);
+    expect(gate.contains('AdminLegalOverlay('), isTrue);
   });
 
   test('Le panneau CGU ADMIN conserve les 14 articles et le consentement', () {
