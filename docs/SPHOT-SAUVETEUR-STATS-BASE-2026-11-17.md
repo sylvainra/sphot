@@ -121,6 +121,17 @@ d'un identifiant en cas de deux premières publications réellement
 concurrentes ; cette limite doit être testée et corrigée séparément si
 des publications simultanées sont possibles.
 
+Le 17/11/2026, le précontrôle local a aussi révélé un import
+`mainCouranteReadBounds` absent ou réorganisé dans `functions/index.js`.
+La fusion ne s'appuie plus sur ce symbole comme point d'insertion :
+elle repère spécifiquement l'import du module
+`sauveteur_main_courante_lifecycle` et, en cas d'organisation différente,
+ajoute un `require` autonome de `parisCivilYear` sans changer le code
+importé local. Le helper STATS bénéficie du même repli contrôlé.
+Des simulations couvrent l'import historique, un import sans
+`mainCouranteReadBounds`, un bloc absent et une seconde application sans
+duplication. Ces simulations ne remplacent PAS un test sur la machine locale.
+
 Avant toute écriture, le script vérifie que son calcul reproduit EXACTEMENT
 le commit STATS cible depuis le commit initial.
 Il conserve une sauvegarde dans le répertoire temporaire du système et
