@@ -134,6 +134,44 @@ void main() {
     expect(panelClicks, 1);
   });
 
+  test('La carte réelle et les étapes Admin restent visibles '
+      'sans flux Firestore pendant le verrou CGU', () {
+    final dashboard = File('lib/web/admin/pages/admin_dashboard_page.dart')
+        .readAsStringSync();
+    final gate = File('lib/web/shared/professional_legal_gate.dart')
+        .readAsStringSync();
+
+    expect(dashboard.contains('Widget _buildAdminLegalBackdrop()'), isTrue);
+    final backdropStart =
+        dashboard.indexOf('Widget _buildAdminLegalBackdrop()');
+    final backdropEnd = dashboard.indexOf(
+        'Widget _buildDashboardContent(BuildContext context)', backdropStart);
+    final backdrop = dashboard.substring(backdropStart, backdropEnd);
+    expect(backdrop.contains('_buildRightPanel('), isTrue);
+    expect(backdrop.contains('FlutterMap('), isTrue);
+    expect(backdrop.contains('TileLayer('), isTrue);
+    expect(backdrop.contains('lockedDashboard: _buildAdminLegalBackdrop()'),
+        isTrue);
+    // Vrais composants du dashboard, pas une maquette en texte.
+    for (final step in <String>[
+      'CRÉER UN SPHOT',
+      'CRÉER UNE PÉRIODE',
+      'CRÉER UN SAUVETEUR',
+      'ESPACE SPHOT ADMIN',
+      'ESSAI GRATUIT 8 JOURS',
+    ]) {
+      expect(dashboard.contains(step), isTrue);
+    }
+    expect(gate.contains('dashboard: widget.lockedDashboard ?? widget.child'),
+        isTrue);
+    expect(gate.contains('if (!_loading && _error == null && !_required) '
+        'return widget.child;'), isTrue);
+    expect(gate.contains('widget.audience == ProfessionalLegalAudience.admin'),
+        isTrue);
+    expect(gate.contains('lockedDashboard: widget.audience == '
+        'ProfessionalLegalAudience.admin'), isTrue);
+  });
+
   test('La demande d’accès garde les CGU ADMIN versionnées', () {
     final registration =
         File('lib/web/admin/pages/admin_trial_request_page.dart')
