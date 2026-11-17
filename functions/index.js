@@ -11979,10 +11979,9 @@ exports.getSauveteurStats = onRequest(
         const {context} = session;
         const spotId = (request.body.spotId || "").toString().trim();
 
-        if (!context.assignedSpotIds.includes(spotId) ||
-            !(await supervisedSpotIds(
-                admin.firestore(), context.territoireId, [spotId]))
-                .includes(spotId)) {
+        // Correspond aux droits temps réel du sauveteur sur un
+        // poste affecté, surveillé et autorisé à la diffusion.
+        if (!context.realtimeSpotIds.includes(spotId)) {
           response.status(403).json({
             success: false,
             error: "spot_not_assigned",
