@@ -15136,10 +15136,58 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   // Une nouvelle acceptation est demandée uniquement si la version a changé,
   // et jamais à chaque connexion lorsque la preuve courante existe.
   // Le parcours CGV de commande reste indépendant.
+  // Décor juridique : les vrais composants de la carte et du parcours
+  // Admin (dont ses cinq premières étapes) restent visibles même lorsque
+  // les flux métiers Firestore n'ont pas encore répondu.
+  // Aucune donnée opérationnelle n'est nécessaire pour afficher ce décor.
+  Widget _buildAdminLegalBackdrop() {
+    final tileStyle = _tileStyles[_selectedTileStyle];
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildRightPanel(
+          visibleSpots: _visibleOnMapSpotCount,
+          canRequestTrial: false,
+        ),
+        Expanded(
+          child: FlutterMap(
+            key: ValueKey<String>(
+              'admin-legal-map-'
+              '${_territoryCenter.latitude}-'
+              '${_territoryCenter.longitude}-$_selectedTileStyle',
+            ),
+            options: MapOptions(
+              initialCenter: _territoryCenter,
+              initialZoom: _territoryZoom,
+              minZoom: 2,
+              maxZoom: 18,
+            ),
+            children: [
+              TileLayer(
+                urlTemplate: tileStyle.url,
+                subdomains: tileStyle.subdomains,
+                maxZoom: tileStyle.maxZoom.toDouble(),
+                maxNativeZoom: tileStyle.maxZoom,
+                userAgentPackageName: 'com.sylvainra.sphot',
+              ),
+              if (_administratorTerritoryMarkerData != null)
+                MarkerLayer(
+                  markers: [
+                    _buildAdminMarker(_administratorTerritoryMarkerData!),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) => ProfessionalLegalGate(
     audience: ProfessionalLegalAudience.admin,
     child: _buildDashboardContent(context),
+    lockedDashboard: _buildAdminLegalBackdrop(),
   );
 
   Widget _buildDashboardContent(BuildContext context) {
