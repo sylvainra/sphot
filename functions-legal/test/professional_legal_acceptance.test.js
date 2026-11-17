@@ -122,3 +122,42 @@ test("les versions exactes sont exigées et les preuves anciennes restent", () =
     action: "accept", versionId: "1.4:r3", accepted: false,
   }), /ACTION_OU_CHAMPS_INTERDITS/);
 });
+
+test("ADMIN : nouvelle version impose reacceptation sans effacer l'historique", async () => {
+  const f = fixture("ADMIN");
+  const initial = await action({admin: f.admin, token: f.token,
+    input: {action: "status"}});
+  assert.equal(initial.required, true);
+  assert.equal(initial.versionId, "1.2:r1");
+  const first = await action({admin: f.admin, token: f.token,
+    input: {action: "accept", versionId: "1.2:r1", accepted: true}});
+  assert.equal(first.accepted, true);
+  let status = await action({admin: f.admin, token: f.token,
+    input: {action: "status"}});
+  assert.equal(status.required, false);
+
+  const doc = f.docs.get("legalDocuments/adminCgu");
+  doc.version = "1.8";
+  doc.revision = 1;
+  status = await action({admin: f.admin, token: f.token,
+    input: {action: "status"}});
+  assert.equal(status.required, true);
+  assert.equal(status.versionId, "1.8:r1");
+
+  await assert.rejects(
+      action({admin: f.admin, token: f.token, input: {
+        action: "accept", versionId: "1.2:r1", accepted: true,
+      }}),
+      /DOCUMENT_JURIDIQUE_MODIFIE_RECHARGEZ/);
+  const second = await action({admin: f.admin, token: f.token,
+    input: {action: "accept", versionId: "1.8:r1", accepted: true}});
+  assert.equal(second.accepted, true);
+  status = await action({admin: f.admin, token: f.token,
+    input: {action: "status"}});
+  assert.equal(status.required, false);
+
+  const recordPath = "professionalLegalAcceptances/ADMIN_" + f.token.uid;
+  assert.equal(f.docs.get(recordPath).versionId, "1.8:r1");
+  assert.equal([...f.docs.keys()].filter(
+      (key) => key.startsWith(recordPath + "/history/")).length, 2);
+});
