@@ -181,8 +181,7 @@ void main() {
         'return widget.child;'), isTrue);
     expect(gate.contains('widget.audience == ProfessionalLegalAudience.admin'),
         isTrue);
-    expect(gate.contains('lockedDashboard: widget.audience == '
-        'ProfessionalLegalAudience.admin'), isTrue);
+    expect(gate.contains('lockedDashboard: widget.lockedDashboard,'), isTrue);
   });
 
   test('La demande d’accès garde les CGU ADMIN versionnées', () {
