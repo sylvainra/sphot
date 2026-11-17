@@ -57,6 +57,13 @@ void main() {
     expect(source, contains('onPressed: _canGoToNextMonth ?'));
   });
 
+  test('Le rendu reste possible avant la mise à jour Firebase', () {
+    expect(source, contains("final hasSeasonData = decoded['seasonPeriods'] is List;"));
+    expect(source, contains('_seasonDataAvailable = hasSeasonData;'));
+    expect(source, contains('mise à jour serveur'));
+    expect(source, contains("title: 'BILAN MENSUEL'"));
+  });
+
   test('Les bilans et le PDF conservent les recherches distinctes', () {
     expect(source, contains('final searches = <String>{};'));
     expect(source, contains('searches.add(caseId.isNotEmpty'));
