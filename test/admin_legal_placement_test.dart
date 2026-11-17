@@ -71,7 +71,7 @@ void main() {
   test('Le volet de modifications reste compact sur la carte Admin', () {
     final overlay = File('lib/web/shared/admin_legal_overlay.dart')
         .readAsStringSync();
-    expect(overlay.contains('Alignment.centerRight'), isTrue);
+    expect(overlay.contains('alignment: Alignment.center,'), isTrue);
     expect(overlay.contains('maxWidth: 620'), isTrue);
     expect(overlay.contains('AbsorbPointer('), isTrue);
     expect(overlay.contains('ExcludeFocus('), isTrue);
