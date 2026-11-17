@@ -92,27 +92,16 @@ class _ProfessionalLegalGateState extends State<ProfessionalLegalGate> {
       stream: _published,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          if (widget.audience == ProfessionalLegalAudience.admin) {
-            return _adminStatus(
-              'Document juridique momentanément inaccessible',
-              'Impossible de vérifier les CGU SPHOT ADMIN.',
-            );
-          }
-          return _GateMessage(
-            title: 'Document juridique momentanément inaccessible',
-            detail: 'Impossible de vérifier les CGU $_displayName.',
+          return _adminStatus(
+            'Document juridique momentanément inaccessible',
+            'Impossible de vérifier les CGU $_displayName.',
           );
         }
         if (!snapshot.hasData) {
-          if (widget.audience == ProfessionalLegalAudience.admin) {
-            return _adminStatus(
-              'Vérification de vos CGU',
-              'Chargement de la version publiée…',
-              loading: true,
-            );
-          }
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
+          return _adminStatus(
+            'Vérification de vos CGU',
+            'Chargement de la version publiée…',
+            loading: true,
           );
         }
         final data = snapshot.data!.data();
@@ -133,17 +122,10 @@ class _ProfessionalLegalGateState extends State<ProfessionalLegalGate> {
               data,
               chapterCount: _chapterCount,
             )) {
-          if (widget.audience == ProfessionalLegalAudience.admin) {
-            return _adminStatus(
-              'Version juridique incomplète',
-              'Les 14 articles CGU ADMIN doivent être vérifiés '
-                  'par l’équipe SPHOT.',
-            );
-          }
-          return _GateMessage(
-            title: 'Version juridique incomplète',
-            detail: 'Les CGU $_displayName sont publiées mais '
-                'leur contenu doit être vérifié par l’équipe SPHOT.',
+          return _adminStatus(
+            'Version juridique incomplète',
+            'Les $_chapterCount articles CGU $_displayName doivent '
+                'être vérifiés par l’équipe SPHOT.',
           );
         }
         final versionId = LegalPublishedVersion.identifier(
