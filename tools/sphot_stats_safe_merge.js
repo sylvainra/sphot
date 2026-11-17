@@ -241,6 +241,33 @@ function safeScopedMerge(local, base, feature) {
       }
     }
 
+    // The STATS endpoint now uses mainCouranteReadBounds. A local branch
+    // with old date querying may have removed this import entirely.
+    // A syntax-only check would miss the resulting ReferenceError at runtime.
+    const boundImported = lifecycleImports.some((m) =>
+      /(?:^|,)\s*mainCouranteReadBounds\s*(?:,|$)/.test(m[1]));
+    if (!boundImported) {
+      assert(!/\b(?:const|let|var|function|class)\s+mainCouranteReadBounds\b/.test(
+          result), "mainCouranteReadBounds existe hors import connu");
+      const standaloneBound =
+          'const {mainCouranteReadBounds} = ' +
+          'require("./sauveteur_main_courante_lifecycle");\n';
+      if (lifecycleImports.length === 1) {
+        const localImport = lifecycleImports[0][0];
+        assert(result.split(localImport).length === 2,
+            "Import lifecycle dupliqué : arrêt sécurisé");
+        result = result.replace(localImport,
+            localImport + "\n" + standaloneBound.trimEnd());
+      } else {
+        assert(lifecycleImports.length === 0,
+            "Plusieurs imports lifecycle : examen manuel");
+        const strict = result.match(/^(?:"use strict"|'use strict');\n/);
+        const at = strict ? strict[0].length : 0;
+        result = result.slice(0, at) + standaloneBound +
+            result.slice(at);
+      }
+    }
+
     const helperAnchor =
         '} = require("./sauveteur_main_courante_lifecycle");\n';
     const helper =
