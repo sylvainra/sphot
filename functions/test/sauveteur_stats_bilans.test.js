@@ -108,3 +108,48 @@ test("les bilans et le PDF utilisent les recherches distinctes " +
   assert.match(ui, /Recherches distinctes : /);
   assert.match(ui, /_eventRow\(stats\.summary\)/);
 });
+
+test("les faits journaliers ne répètent pas les trois compteurs", () => {
+  const ui = read("lib/pages/sauveteur/sauveteur_stats_page.dart");
+  const day = ui.split("Widget _dayCard(_DailyStats stats) {")[1]
+      .split("Future<Uint8List> _buildPdf()")[0];
+  assert.match(day, /stats\\.facts\\.entries\\.where\\(\\(entry\\)/);
+  for (const category of ["incident", "intervention", "personne recherchée"]) {
+    assert.match(day, new RegExp("type != '" + category + "'"));
+  }
+  assert.match(day, /if \\(stats\\.facts\\.isEmpty\\)/);
+  assert.match(day, /else if \\(factEntries\\.isNotEmpty\\)/);
+  assert.match(day, /_eventRow\\(stats\\.summary\\)/);
+  assert.match(day, /stats\\.rescueQualifications\\.isNotEmpty/);
+});
+
+test("libellés de compteurs plus grands mais adaptés à la largeur", () => {
+  const ui = read("lib/pages/sauveteur/sauveteur_stats_page.dart");
+  const count = ui.split("Widget _eventCount({")[1]
+      .split("Widget _eventRow(")[0];
+  assert.match(count, /fontSize: 16/);
+  assert.match(count, /fontSize: 10\\.5/);
+  assert.match(count, /FittedBox\\(/);
+  assert.match(count, /BoxFit\\.scaleDown/);
+});
+
+test("accès rapide aux bilans tout en conservant le défilement", () => {
+  const ui = read("lib/pages/sauveteur/sauveteur_stats_page.dart");
+  const build = ui.split("Widget build(BuildContext context) {")[1]
+      .split("class _SeasonPeriod {")[0];
+  assert.match(ui, /Scrollable\\.ensureVisible\\(/);
+  assert.match(ui, /_monthlySummaryKey\\.currentContext/);
+  assert.match(build, /'VOIR LES BILANS'/);
+  assert.match(build, /SingleChildScrollView\\(/);
+  assert.match(build, /key: _monthlySummaryKey/);
+  assert.match(build, /title: 'BILAN MENSUEL'/);
+  assert.match(build, /title: 'BILAN SAISONNIER '/);
+  assert.match(build, /'PARTAGER'/);
+});
+
+test("les mois futurs ne peuvent pas être sélectionnés", () => {
+  const ui = read("lib/pages/sauveteur/sauveteur_stats_page.dart");
+  assert.match(ui, /bool get _canGoToNextMonth/);
+  assert.match(ui, /if \\(target\\.isAfter\\(DateTime\\(now\\.year, now\\.month\\)\\)\\)/);
+  assert.match(ui, /onPressed: _canGoToNextMonth \\?/);
+});
