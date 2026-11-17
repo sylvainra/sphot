@@ -64,8 +64,8 @@ void main() {
     expect(gate.contains('CONSULTER LES'), isTrue);
     expect(gate.contains('if (full)'), isTrue);
     expect(gate.contains('...widget.chapters.map((chapter)'), isTrue);
-    expect(gate.contains('j’accepte l’intégralité des CGU SPHOT ADMIN'),
-        isTrue);
+    expect(gate.contains(
+      r'j’accepte l’intégralité des CGU ${widget.displayName}'), isTrue);
   });
 
   test('Le volet de modifications reste compact sur la carte Admin', () {
@@ -171,6 +171,41 @@ void main() {
         isTrue);
     expect(gate.contains('lockedDashboard: widget.audience == '
         'ProfessionalLegalAudience.admin'), isTrue);
+  });
+
+  test('SPHOT PUBLICITAIRE affiche les seules corrections publiées '
+      'sur le vrai dashboard et conserve les CGU complètes', () {
+    final gate = File('lib/web/shared/professional_legal_gate.dart')
+        .readAsStringSync();
+    final dashboard =
+        File('lib/web/advertiser/pages/advertiser_dashboard_page.dart')
+            .readAsStringSync();
+    final legalServer =
+        File('functions-legal/professional_legal_acceptance.js')
+            .readAsStringSync();
+
+    expect(dashboard.contains('if (!widget.approvedAccess) return dashboard;'),
+        isTrue);
+    expect(dashboard.contains('ProfessionalLegalAudience.advertiser'),
+        isTrue);
+    expect(dashboard.contains('child: dashboard,'), isTrue);
+    expect(dashboard.contains('Widget _buildDashboardContent('), isTrue);
+    expect(dashboard.contains('SizedBox(width: sidebarWidth, '
+        'child: _buildSidebar())'), isTrue);
+    expect(dashboard.contains('_buildMap('), isTrue);
+    expect(dashboard.contains('FlutterMap('), isTrue);
+    expect(gate.contains("result['advertiserChanges']"), isTrue);
+    expect(gate.contains('_advertiserModifiedArticles'), isTrue);
+    expect(gate.contains("widget.documentId == 'advertiserCgu'"), isTrue);
+    expect(gate.contains('advertiser: widget.documentId == '
+        "'advertiserCgu'"), isTrue);
+    expect(gate.contains('...changes.map(_adminChangedArticle)'), isTrue);
+    expect(gate.contains('CONSULTER LES'), isTrue);
+    expect(gate.contains('...widget.chapters.map((chapter)'), isTrue);
+    expect(gate.contains('dashboard: widget.lockedDashboard ?? widget.child'),
+        isTrue);
+    expect(legalServer.contains('result.advertiserChanges'), isTrue);
+    expect(legalServer.contains('actor.role === "ANNONCEUR"'), isTrue);
   });
 
   test('La demande d’accès garde les CGU ADMIN versionnées', () {
