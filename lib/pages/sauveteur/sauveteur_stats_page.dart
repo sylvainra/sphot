@@ -777,6 +777,12 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
         totals[entry.key] = (totals[entry.key] ?? 0) + entry.value;
       }
     }
+    final otherFacts = totals.entries.where((entry) {
+      final type = entry.key.trim().toLowerCase();
+      return type != 'incident' &&
+          type != 'intervention' &&
+          type != 'personne recherchée';
+    }).toList();
 
     document.addPage(
       pw.MultiPage(
@@ -801,6 +807,15 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
           ),
           pw.SizedBox(height: 12),
           pw.Text(
+            'Bilan mensuel ' + _monthLabel +
+            (_monthlyProvisional ? ' (provisoire)' : ' (clos)'),
+            style: pw.TextStyle(
+              fontSize: 11,
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
+          pw.SizedBox(height: 6),
+          pw.Text(
             'Drapeaux - total période',
             style: pw.TextStyle(
               fontSize: 11,
@@ -821,20 +836,20 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
           ),
           pw.SizedBox(height: 10),
           pw.Text(
-            'Faits - total période',
+            'Autres faits - total période',
             style: pw.TextStyle(
               fontSize: 11,
               fontWeight: pw.FontWeight.bold,
             ),
           ),
           pw.SizedBox(height: 4),
-          if (totals.isEmpty)
+          if (otherFacts.isEmpty)
             pw.Text(
-              'Aucun fait enregistré.',
+              'Aucun autre fait enregistré.',
               style: const pw.TextStyle(fontSize: 9),
             )
           else
-            ...totals.entries.map(
+            ...otherFacts.map(
               (entry) => pw.Text(
                 '${entry.key} : ${entry.value}',
                 style: const pw.TextStyle(fontSize: 9),
@@ -870,7 +885,12 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
               '   Recherches distinctes : ' + season.searches.toString(),
               style: const pw.TextStyle(fontSize: 9),
             ),
-            ...season.facts.entries.map((entry) => pw.Text(
+            ...season.facts.entries.where((entry) {
+              final type = entry.key.trim().toLowerCase();
+              return type != 'incident' &&
+                  type != 'intervention' &&
+                  type != 'personne recherchée';
+            }).map((entry) => pw.Text(
                   entry.key + ' : ' + entry.value.toString(),
                   style: const pw.TextStyle(fontSize: 8),
                 )),
