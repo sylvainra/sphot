@@ -51,6 +51,36 @@ void main() {
         isTrue);
   });
 
+  test('L’écran ADMIN cible automatiquement les corrections sans '
+      'masquer les CGU complètes', () {
+    final gate = File('lib/web/shared/professional_legal_gate.dart')
+        .readAsStringSync();
+    expect(gate.contains("result['adminChanges']"), isTrue);
+    expect(gate.contains('...changes.map(_adminChangedArticle)'), isTrue);
+    expect(gate.contains('SphotLegalArticleMarkdown(markdown: after)'),
+        isTrue);
+    expect(gate.contains('Consulter l’ancienne rédaction'), isTrue);
+    expect(gate.contains('CONSULTER LES'), isTrue);
+    expect(gate.contains('if (full)'), isTrue);
+    expect(gate.contains('...widget.chapters.map((chapter)'), isTrue);
+    expect(gate.contains('j’accepte l’intégralité des CGU SPHOT ADMIN'),
+        isTrue);
+  });
+
+  test('Le volet de modifications reste compact sur la carte Admin', () {
+    final overlay = File('lib/web/shared/admin_legal_overlay.dart')
+        .readAsStringSync();
+    expect(overlay.contains('Alignment.centerRight'), isTrue);
+    expect(overlay.contains('maxWidth: 620'), isTrue);
+    expect(overlay.contains('AbsorbPointer('), isTrue);
+    expect(overlay.contains('ExcludeFocus('), isTrue);
+    expect(overlay.contains('ExcludeSemantics('), isTrue);
+    expect(overlay.contains('dismissible: false'), isTrue);
+    final dashboard = File('lib/web/admin/pages/admin_dashboard_page.dart')
+        .readAsStringSync();
+    expect(dashboard.contains('_buildDashboardContent(context)'), isTrue);
+  });
+
   testWidgets('La carte et les cinq étapes Admin restent visibles '
       'mais non interactives avant acceptation', (tester) async {
     var backgroundClicks = 0;

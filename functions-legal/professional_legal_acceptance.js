@@ -3,6 +3,7 @@
 // Un seul point serveur pour les acceptations récurrentes ADMIN/PUBLICITAIRE.
 // Le Super Admin publie les CGU via legal_document_editor.js ; ce module
 // compare toujours les versions courantes dans Firestore à chaque accès.
+const {buildAdminChanges} = require("./admin_legal_changes");
 const ORIGINS = [
   "https://sphot.app", "https://www.sphot.app",
   "https://sphot-ab80b.web.app", "https://sphot-ab80b.firebaseapp.com",
@@ -66,6 +67,46 @@ function validateInput(input) {
   return input;
 }
 
+
+// Charge uniquement une version archivee et verifie l'identite de son document.
+// L'absence d'une preuve de consentement historique ne permet pas d'affirmer
+// que la version precedente a ete acceptee : la comparaison est alors etiquetee.
+async function adminChangeHistory(db, current, recorded, versionId) {
+  const revision = current.revision;
+  if (!Number.isSafeInteger(revision) || revision <= 0) return null;
+  const previousId = clean(recorded?.versionId);
+  const match = /^([^:]+):r(\d+)$/.exec(previousId);
+  const trustedAcceptance = recorded?.accepted === true &&
+    recorded?.documentId === "adminCgu" &&
+    match !== null && Number(match[2]) < revision;
+  const baselineRevision = trustedAcceptance ? Number(match[2]) : revision - 1;
+  if (!Number.isSafeInteger(baselineRevision) ||
+      baselineRevision < 0 || baselineRevision >= revision) return null;
+  const root = "adminCgu_r" + String(baselineRevision).padStart(8, "0");
+  const history = db.collection("legalVersions");
+  const [published, legacy] = await Promise.all([
+    history.doc(root + "_published").get(),
+    history.doc(root + "_legacy").get(),
+  ]);
+  // La copie "legacy" fige la publication immediatement precedente ; elle
+  // prime sur un eventuel ancien enregistrement "published" de meme revision.
+  const candidates = [legacy.data(), published.data()];
+  const previous = candidates.find((data) =>
+    data?.documentId === "adminCgu" &&
+    data?.revision === baselineRevision &&
+    Array.isArray(data?.chapters) && data.chapters.length === 14 &&
+    (!trustedAcceptance || data.version === match[1]));
+  if (!previous) return null;
+  const baselineVersionId =
+    previous.version + ":r" + previous.revision;
+  // Eviter l'affichage de fragments sur une archive sans preuve fiable.
+  if (!clean(previous.version)) return null;
+  return buildAdminChanges(previous.chapters, current.chapters, {
+    baselineVersionId, versionId,
+    baselineKind: trustedAcceptance ? "lastAccepted" : "previousPublished",
+  });
+}
+
 async function action({admin, token, input}) {
   const actor = activeProfile(token);
   const request = validateInput(input);
@@ -82,9 +123,22 @@ async function action({admin, token, input}) {
     if (!versionId) return {published: false, required: false,
       documentId: actor.documentId};
     const current = {documentId: actor.documentId, versionId};
-    return {published: true, required:
-      requiresAcceptance(current, recorded.data()),
-    documentId: actor.documentId, versionId};
+    const required = requiresAcceptance(current, recorded.data());
+    const result = {published: true, required,
+      documentId: actor.documentId, versionId};
+    // Seul ADMIN reçoit les écarts éditoriaux. PUBLICITAIRE reste identique.
+    if (actor.role === "ADMIN" && required) {
+      try {
+        result.adminChanges = await adminChangeHistory(db, legal.data(),
+            recorded.data(), versionId);
+      } catch (error) {
+        // Une archive indisponible ne doit jamais contourner les CGU :
+        // l'interface affiche alors le texte complet.
+        console.warn("Historique CGU ADMIN indisponible :", error);
+        result.adminChanges = null;
+      }
+    }
+    return result;
   }
 
   return db.runTransaction(async (tx) => {
@@ -141,4 +195,4 @@ function register({admin, onRequest}) {
   });
 }
 module.exports = {PROFILES, activeProfile, legalVersion,
-  requiresAcceptance, validateInput, action, register};
+  requiresAcceptance, validateInput, adminChangeHistory, action, register};
