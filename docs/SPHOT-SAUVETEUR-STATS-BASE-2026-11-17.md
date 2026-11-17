@@ -169,6 +169,46 @@ doit être renouvelé pour prendre cette correction en compte.
 Aucun de ces constats ne vaut autorisation d'un déploiement Firebase ;
 le backend n'est pas déployé depuis ce chantier.
 
+## Vérifications locales complétées le 17/11/2026 (vers 20 h Paris)
+
+- Le script local `tools/sphot_stats_safe_merge.js --check` a réussi ;
+  `--apply` a ensuite intégré les modifications STATS dans le
+  `functions/index.js` de la machine Windows, sans commit ni déploiement.
+- `node --check functions/index.js` et
+  `node --check functions/sauveteur_stats_support.js` : réussis.
+- `node --test functions/test/sauveteur_stats_bilans.test.js` :
+  **10 tests sur 10 réussis**.
+- ESLint ciblé `index.js sauveteur_stats_support.js
+  test/sauveteur_stats_bilans.test.js` : sortie vide, contrôle réussi.
+- Sauvegarde locale déclarée :
+  `C:\\Users\\SurfS\\Documents\\SPHOT_STATS_REPRISE_20261117`.
+  Cette sauvegarde n'est PAS dans GitHub et contient du code local distinct
+  de la branche d'essai.
+- Projet Firebase actif `sphot-ab80b` ; fonctions existantes
+  `getSauveteurStats` et `updateSauveteurLiveState`, génération v2,
+  `us-central1`, Node.js 22. Aucun déploiement effectué.
+- `firebase.json` local change la commande de pré-déploiement en
+  `npm --prefix functions run lint:deploy`, dont le script est
+  `eslint "*.js"`. **Échec local : 26 erreurs ESLint** dans
+  quatre modules Odoo de racine :
+  `odoo_billing_context_preflight.js`,
+  `odoo_checkout_identity.js`,
+  `odoo_checkout_verified_preparation.js` et
+  `odoo_https_client.js`. Ne pas les corriger en masse ni les ignorer
+  silencieusement ; le prédeploy échouerait tel quel.
+- Comparaison avant/après de la fonction
+  `getSauveteurMainCourante` : **identique (`True`)**.
+  L'échec restant dans les 19 tests du cycle de vie est donc antérieur
+  à la fusion STATS et lié aux différences d'autorisations et de lecture
+  par année (ne pas simplement adapter l'assertion pour le masquer).
+- L'erreur PowerShell sur `else` vient de son exécution séparée du bloc
+  `if`, sans effet sur la comparaison ni sur les fichiers.
+
+**Condition avant publication :** résoudre ou isoler proprement les
+26 erreurs de lint Odoo, analyser les dépendances réellement emballées par
+Firebase et revoir la non-régression MAIN COURANTE. Pas de déploiement
+`firebase deploy` ni `git add .` à ce stade.
+
 ## Vérifications indispensables après raccordement
 
 1. Sur l'émulateur sauveteur connecté, ouvrir STATS, cliquer « VOIR LES
