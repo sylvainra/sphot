@@ -28,10 +28,13 @@ class ProfessionalLegalGate extends StatefulWidget {
     super.key,
     required this.audience,
     required this.child,
+    this.lockedBackground,
   });
 
   final ProfessionalLegalAudience audience;
   final Widget child;
+  // Décor visible uniquement pendant le verrou ADMIN, sans requête métier.
+  final Widget? lockedBackground;
 
   @override
   State<ProfessionalLegalGate> createState() =>
@@ -47,7 +50,7 @@ class _ProfessionalLegalGateState extends State<ProfessionalLegalGate> {
     bool loading = false,
   }) {
     return AdminLegalOverlay(
-      dashboard: widget.child,
+      dashboard: widget.lockedBackground ?? widget.child,
       fullHeight: false,
       panel: AdminLegalStatusPanel(
         title: title,
@@ -155,6 +158,7 @@ class _ProfessionalLegalGateState extends State<ProfessionalLegalGate> {
               .map((part) => Map<String, dynamic>.from(part))
               .toList(),
           child: widget.child,
+          lockedBackground: widget.lockedBackground,
         );
       },
     );
@@ -169,6 +173,7 @@ class _PublishedProfessionalLegalGate extends StatefulWidget {
     required this.versionId,
     required this.chapters,
     required this.child,
+    this.lockedBackground,
   });
 
   final String documentId;
@@ -176,6 +181,7 @@ class _PublishedProfessionalLegalGate extends StatefulWidget {
   final String versionId;
   final List<Map<String, dynamic>> chapters;
   final Widget child;
+  final Widget? lockedBackground;
 
   @override
   State<_PublishedProfessionalLegalGate> createState() =>
@@ -529,7 +535,7 @@ class _PublishedProfessionalLegalGateState
             : _adminAcceptancePanel();
 
     return AdminLegalOverlay(
-      dashboard: widget.child,
+      dashboard: widget.lockedBackground ?? widget.child,
       fullHeight: !_loading && _error == null,
       panel: status,
     );
