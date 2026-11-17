@@ -58,6 +58,11 @@ function run() {
   const base = git(["show", BASE + ":" + TARGET]);
   const proposed = git(["show", FEATURE + ":" + TARGET]);
   const current = fs.readFileSync(indexPath);
+  // Git objects use LF, while Windows worktrees often use CRLF.
+  // Normalizing only the temporary comparison prevents false conflicts.
+  const localUsesCrLf = current.toString("utf8").includes("\r\n");
+  const normalizedCurrent = Buffer.from(
+      current.toString("utf8").replace(/\r\n/g, "\n"), "utf8");
   const session = fs.mkdtempSync(path.join(os.tmpdir(), "sphot-stats-merge-"));
   const currentFile = path.join(session, "current-index.js");
   const baseFile = path.join(session, "reference-index.js");
@@ -65,7 +70,7 @@ function run() {
   const mergePreview = path.join(session, "merged-index.js");
   const backup = path.join(session, "index-before-merge.js");
 
-  fs.writeFileSync(currentFile, current);
+  fs.writeFileSync(currentFile, normalizedCurrent);
   fs.writeFileSync(baseFile, base);
   fs.writeFileSync(proposedFile, proposed);
   fs.writeFileSync(backup, current);
@@ -136,7 +141,9 @@ function run() {
   }
 
   // Every check has passed before the first file is written.
-  fs.writeFileSync(indexPath, merged.stdout);
+  const mergedOnDisk = localUsesCrLf ?
+    Buffer.from(result.replace(/\n/g, "\r\n"), "utf8") : merged.stdout;
+  fs.writeFileSync(indexPath, mergedOnDisk);
   for (const {dest, data} of auxiliaries) {
     if (!fs.existsSync(dest)) {
       fs.mkdirSync(path.dirname(dest), {recursive: true});
