@@ -35,7 +35,7 @@ class AdminLegalOverlay extends StatelessWidget {
           ),
           const ModalBarrier(
             dismissible: false,
-            color: Color(0xAE10233F),
+            color: Color(0x8810233F),
           ),
           SafeArea(
             child: Padding(
