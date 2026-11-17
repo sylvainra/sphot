@@ -40,7 +40,7 @@ void main() {
   test('Le panneau CGU ADMIN conserve les 14 articles et le consentement', () {
     final gate = File('lib/web/shared/professional_legal_gate.dart')
         .readAsStringSync();
-    expect(gate.contains("if (widget.documentId == 'adminCgu')"), isTrue);
+    expect(gate.contains("if (widget.documentId == 'adminCgu' ||"), isTrue);
     expect(gate.contains('AdminLegalOverlay('), isTrue);
     expect(gate.contains('...widget.chapters.map((chapter)'), isTrue);
     expect(gate.contains('SphotLegalArticleMarkdown('), isTrue);
