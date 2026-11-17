@@ -35,23 +35,24 @@ class AdminLegalOverlay extends StatelessWidget {
           ),
           const ModalBarrier(
             dismissible: false,
-            color: Color(0x8810233F),
+            color: Color(0x4D10233F),
           ),
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(
-                horizontal: 14,
+                horizontal: 24,
                 vertical: 16,
               ),
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final heightLimit = constraints.maxHeight;
                   final panelHeight = fullHeight
-                      ? (heightLimit > 760 ? 760.0 : heightLimit)
+                      ? (heightLimit > 630 ? 630.0 : heightLimit)
                       : (heightLimit > 270 ? 270.0 : heightLimit);
-                  return Center(
+                  return Align(
+                    alignment: Alignment.centerRight,
                     child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 920),
+                      constraints: const BoxConstraints(maxWidth: 620),
                       child: SizedBox(
                         height: panelHeight,
                         child: Material(
