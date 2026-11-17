@@ -107,6 +107,20 @@ Une variante locale n'est acceptée que si elle correspond strictement
 à ces deux différences ; toute autre différence de la fonction STATS
 stoppe l'opération, sans écrasement.
 
+Le diagnostic complémentaire du même jour montre que la fonction locale
+`updateSauveteurLiveState` lit directement le document SPHOT par
+`spotReference.get()` puis sauvegarde avec `batch.commit()`, alors que
+le code de la branche d'essai utilise `db.runTransaction`.
+La fusion de secours **ne remplace pas ce fonctionnement local** :
+elle ajoute uniquement la création/réutilisation de `searchCaseId`
+après la lecture du SPHOT, sa mémorisation dans `notificationPublique`
+et le même identifiant dans l'inscription `mainCourante`.
+Elle exige des ancres structurelles uniques et s'arrête si elles diffèrent.
+Cette intégration locale par lecture + batch ne garantit pas la réutilisation
+d'un identifiant en cas de deux premières publications réellement
+concurrentes ; cette limite doit être testée et corrigée séparément si
+des publications simultanées sont possibles.
+
 Avant toute écriture, le script vérifie que son calcul reproduit EXACTEMENT
 le commit STATS cible depuis le commit initial.
 Il conserve une sauvegarde dans le répertoire temporaire du système et
