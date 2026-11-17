@@ -22,6 +22,7 @@ import '../../../map/map_page.dart';
 import 'package:flutter/services.dart';
 import 'sphot_admin_summary_page.dart';
 import 'admin_subscription_panel.dart';
+import '../../shared/professional_legal_gate.dart';
 import 'admin_quote_server_pdf_service.dart';
 import 'admin_quote_consultation.dart';
 import 'admin_quote_pdf_download.dart';
@@ -15131,11 +15132,15 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
   }
 
-  // L'accord aux CGU ADMIN est recueilli lors de la demande d'accès.
-  // Les conditions de vente sont présentées au parcours de commande.
-  // La connexion quotidienne ne doit pas exiger une nouvelle acceptation.
+  // Le contrôle réutilise les CGU ADMIN publiées dans Firestore.
+  // Une nouvelle acceptation est demandée uniquement si la version a changé,
+  // et jamais à chaque connexion lorsque la preuve courante existe.
+  // Le parcours CGV de commande reste indépendant.
   @override
-  Widget build(BuildContext context) => _buildDashboardContent(context);
+  Widget build(BuildContext context) => ProfessionalLegalGate(
+    audience: ProfessionalLegalAudience.admin,
+    child: _buildDashboardContent(context),
+  );
 
   Widget _buildDashboardContent(BuildContext context) {
     return StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(

@@ -3,11 +3,35 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('La connexion ADMIN ne force pas la validation des CGU', () {
+  test('Le portail ADMIN impose les CGU publiées avant le dashboard', () {
     final dashboard = File('lib/web/admin/pages/admin_dashboard_page.dart')
         .readAsStringSync();
-    expect(dashboard.contains('ProfessionalLegalGate('), isFalse);
-    expect(dashboard.contains('_buildDashboardContent(context)'), isTrue);
+    expect(
+      dashboard.contains("import '../../shared/professional_legal_gate.dart';"),
+      isTrue,
+    );
+    expect(
+      RegExp(
+        r'Widget build\(BuildContext context\)\s*=>\s*'
+        r'ProfessionalLegalGate\(\s*'
+        r'audience:\s*ProfessionalLegalAudience\.admin,\s*'
+        r'child:\s*_buildDashboardContent\(context\),\s*\);',
+      ).hasMatch(dashboard),
+      isTrue,
+    );
+    expect(dashboard.contains('ProfessionalLegalAudience.advertiser'), isFalse);
+  });
+
+  test('La réacceptation ADMIN ne modifie pas le portail PUBLICITAIRE', () {
+    final advertiser =
+        File('lib/web/advertiser/pages/advertiser_dashboard_page.dart')
+            .readAsStringSync();
+    expect(
+      advertiser.contains('ProfessionalLegalAudience.advertiser'),
+      isTrue,
+    );
+    expect(advertiser.contains('if (!widget.approvedAccess) return dashboard;'),
+        isTrue);
   });
 
   test('La demande d’accès garde les CGU ADMIN versionnées', () {
