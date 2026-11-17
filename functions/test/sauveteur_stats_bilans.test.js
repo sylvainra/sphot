@@ -88,7 +88,7 @@ test("les statistiques conservent les protections et suppriment le " +
   const stats = backend.slice(start, end);
   assert.match(stats, /resolveSauveteurSession/);
   assert.match(stats, /legalAcceptanceCurrent/);
-  assert.match(stats, /context\.assignedSpotIds\.includes\(spotId\)/);
+  assert.match(stats, /context\.realtimeSpotIds\.includes\(spotId\)/);
   assert.match(stats, /context\.canManageRestrictedOperationalData/);
   assert.match(stats, /pageQuery\.startAfter\(cursor\)/);
   assert.match(stats, /seasonPeriodsForStation/);
