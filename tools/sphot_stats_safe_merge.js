@@ -42,6 +42,95 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+
+function safeScopedMerge(local, base, feature) {
+  function part(source, start, end, label) {
+    const a = source.indexOf(start);
+    assert(a >= 0 && source.indexOf(start, a + start.length) === -1,
+        "Ancre manquante ou multiple : " + label);
+    const b = source.indexOf(end, a + start.length);
+    assert(b >= 0, "Fin de section manquante : " + label);
+    return {a, b, body: source.slice(a, b)};
+  }
+  function insert(source, old, newer, before, after, label) {
+    function between(v) {
+      const i = v.indexOf(before);
+      assert(i >= 0 && v.indexOf(before, i + before.length) === -1,
+          "Ancre introuvable ou multiple : " + label);
+      const j = v.indexOf(after, i + before.length);
+      assert(j >= 0, "Ancre finale absente : " + label);
+      return v.slice(i + before.length, j);
+    }
+    const was = between(old);
+    const will = between(newer);
+    const here = between(source);
+    assert(was === "" && will.length > 0,
+        "Révision distante inattendue : " + label);
+    if (here === will) return source;
+    assert(here === was, "Modification locale dans " + label +
+        " : arrêt sans écrasement");
+    assert(source.split(before + after).length === 2,
+        "Insertion ambiguë : " + label);
+    return source.replace(before + after, before + will + after);
+  }
+  function apply(src) {
+    let result = src;
+    const from = "exports.getSauveteurStats = onRequest(";
+    const until = "function sanitizeMainCouranteVictim(";
+    const original = part(base, from, until, "statistiques origine");
+    const incoming = part(feature, from, until, "statistiques cible");
+    const existing = part(result, from, until, "statistiques locales");
+    if (existing.body !== incoming.body) {
+      assert(existing.body === original.body,
+          "getSauveteurStats a été modifiée localement : arrêt sans écrasement");
+      result = result.slice(0, existing.a) + incoming.body +
+          result.slice(existing.b);
+    }
+
+    const liveStart = "exports.updateSauveteurLiveState = onRequest(";
+    const liveEnd = "exports.getSauveteurMainCourante = onRequest(";
+    const oldLive = part(base, liveStart, liveEnd, "live origine");
+    const newLive = part(feature, liveStart, liveEnd, "live cible");
+    const localLive = part(result, liveStart, liveEnd, "live local");
+    let updated = insert(localLive.body, oldLive.body, newLive.body,
+        "          const previousSpot = spotSnapshot.data() || {};\n",
+        "          const operationalTerritoryId =",
+        "l'identifiant de la recherche");
+    updated = insert(updated, oldLive.body, newLive.body,
+        '              source: "automatic_person_search_publication",\n',
+        "              publicNotificationMessage:",
+        "le journal des recherches");
+    result = result.slice(0, localLive.a) + updated + result.slice(localLive.b);
+
+    const yearAnchor = "  mainCouranteReadBounds,\n";
+    const yearLine = "  parisCivilYear,\n";
+    assert(feature.includes(yearAnchor + yearLine) &&
+        !base.includes(yearAnchor + yearLine),
+    "Import de l'année civile non confirmé");
+    if (!result.includes(yearAnchor + yearLine)) {
+      assert(result.split(yearAnchor).length === 2,
+          "Import mainCouranteReadBounds ambigu");
+      result = result.replace(yearAnchor, yearAnchor + yearLine);
+    }
+    const helperAnchor =
+        '} = require("./sauveteur_main_courante_lifecycle");\n';
+    const helper =
+        'const {searchCaseIdForNotification, seasonPeriodsForStation} =\n' +
+        '    require("./sauveteur_stats_support");\n';
+    assert(feature.includes(helperAnchor + helper) &&
+        !base.includes(helper), "Import du helper non confirmé");
+    if (!result.includes(helper)) {
+      assert(result.split(helperAnchor).length === 2,
+          "Ancre du helper ambiguë");
+      result = result.replace(helperAnchor, helperAnchor + helper);
+    }
+    return result;
+  }
+  assert(apply(base) === feature,
+      "Version cible différente des seules évolutions STATS : abandon");
+  return apply(local);
+}
+
 function run() {
   const root = git(["rev-parse", "--show-toplevel"], {encoding: "utf8"}).trim();
   const indexPath = path.join(root, TARGET);
@@ -80,17 +169,18 @@ function run() {
     currentFile, baseFile, proposedFile,
   ], {maxBuffer: 30 * 1024 * 1024});
   assert(!merged.error, "git merge-file non disponible");
-  fs.writeFileSync(mergePreview, merged.stdout);
+  let output = merged.stdout;
   if (merged.status !== 0) {
-    process.stderr.write(
-        "CONFLIT : index.js inchangé.\n" +
-        "Aucune modification effectuée.\n" +
-        "Proposition à examiner : " + mergePreview + "\n" +
-        "Code de retour Git : " + merged.status + "\n");
-    process.exit(3);
+    process.stdout.write(
+        "Fusion globale en conflit (" + merged.status +
+        "). Essai ciblé et vérifié sur STATS uniquement...\n");
+    const scoped = safeScopedMerge(
+        normalizedCurrent.toString("utf8"),
+        base.toString("utf8"), proposed.toString("utf8"));
+    output = Buffer.from(scoped, "utf8");
   }
-
-  const result = merged.stdout.toString("utf8");
+  fs.writeFileSync(mergePreview, output);
+  const result = output.toString("utf8");
   const expected = [
     "exports.getSauveteurStats =",
     "exports.updateSauveteurLiveState =",
@@ -142,7 +232,7 @@ function run() {
 
   // Every check has passed before the first file is written.
   const mergedOnDisk = localUsesCrLf ?
-    Buffer.from(result.replace(/\n/g, "\r\n"), "utf8") : merged.stdout;
+    Buffer.from(result.replace(/\n/g, "\r\n"), "utf8") : output;
   fs.writeFileSync(indexPath, mergedOnDisk);
   for (const {dest, data} of auxiliaries) {
     if (!fs.existsSync(dest)) {
