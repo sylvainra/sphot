@@ -38,6 +38,8 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
 
   final List<Map<String, String>> _spots = [];
   List<Map<String, dynamic>> _entries = [];
+  List<_SeasonPeriod> _seasonPeriods = [];
+  int _loadSerial = 0;
 
   String? _selectedSpotId;
   late DateTime _selectedMonth;
@@ -139,14 +141,30 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
   }
 
   Future<void> _loadStats() async {
+    final requestSerial = ++_loadSerial;
     final spotId = _selectedSpotId;
 
     if (spotId == null || spotId.isEmpty) {
       if (!mounted) return;
       setState(() {
         _entries = [];
+        _seasonPeriods = [];
         _loading = false;
         _error = null;
+      });
+      return;
+    }
+
+    // La main courante est conservée uniquement pendant l'année civile
+    // courante ; un bilan historique ne doit jamais être affiché à zéro.
+    if (_selectedMonth.year != DateTime.now().year) {
+      if (!mounted) return;
+      setState(() {
+        _entries = [];
+        _seasonPeriods = [];
+        _loading = false;
+        _error = 'Les statistiques des autres années ne sont pas '
+            'consultables depuis la main courante actuelle.';
       });
       return;
     }
@@ -157,8 +175,10 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
     });
 
     try {
-      final start = DateTime(_selectedMonth.year, _selectedMonth.month);
-      final end = DateTime(_selectedMonth.year, _selectedMonth.month + 1);
+      // L'année entière est nécessaire pour dédupliquer une recherche
+      // entre plusieurs jours et agréger les périodes discontinues.
+      final start = DateTime(_selectedMonth.year);
+      final end = DateTime(_selectedMonth.year + 1);
 
       final response = await http.post(
         Uri.parse(
@@ -169,16 +189,18 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
         body: jsonEncode({
           'sauveteurSessionToken': widget.sauveteurSessionToken,
           'spotId': spotId,
+          'statsYear': _selectedMonth.year,
           'dayStartMillis': start.millisecondsSinceEpoch,
           'dayEndMillis': end.millisecondsSinceEpoch,
         }),
       );
 
-      if (!mounted) return;
+      if (!mounted || requestSerial != _loadSerial) return;
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
         setState(() {
           _entries = [];
+          _seasonPeriods = [];
           _loading = false;
           _error = 'Les statistiques ne sont pas accessibles actuellement.';
         });
@@ -186,23 +208,35 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
       }
 
       final decoded = jsonDecode(response.body);
-      final raw = decoded is Map<String, dynamic> && decoded['entries'] is List
-          ? decoded['entries'] as List
-          : const [];
+      if (decoded is! Map<String, dynamic> ||
+          decoded['entries'] is! List ||
+          decoded['seasonPeriods'] is! List) {
+        throw const FormatException('Réponse de statistiques incomplète.');
+      }
 
-      final entries = raw
+      final entries = (decoded['entries'] as List)
           .whereType<Map>()
           .map((value) => Map<String, dynamic>.from(value))
+          .toList();
+      final periods = (decoded['seasonPeriods'] as List)
+          .whereType<Map>()
+          .map((value) => _SeasonPeriod(
+                startDay: (value['startDay'] as num).toInt(),
+                endDay: (value['endDay'] as num).toInt(),
+              ))
+          .where((period) => period.startDay <= period.endDay)
           .toList();
 
       setState(() {
         _entries = entries;
+        _seasonPeriods = periods;
         _loading = false;
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || requestSerial != _loadSerial) return;
       setState(() {
         _entries = [];
+        _seasonPeriods = [];
         _loading = false;
         _error = 'Impossible de calculer les statistiques pour le moment.';
       });
@@ -233,20 +267,16 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
         .toLowerCase();
   }
 
-  _DailyStats _statsForDay(DateTime day) {
-    final start = DateTime(day.year, day.month, day.day).millisecondsSinceEpoch;
-    final end =
-        DateTime(day.year, day.month, day.day + 1).millisecondsSinceEpoch;
+  int _dayKey(DateTime date) =>
+      date.year * 10000 + date.month * 100 + date.day;
 
-    final entries = _entries.where((entry) {
-      final millis = _entryMillis(entry);
-      return millis != null && millis >= start && millis < end;
-    }).toList();
-
+  _StatsSummary _summarize(Iterable<Map<String, dynamic>> entries) {
     int green = 0;
     int yellow = 0;
     int red = 0;
-
+    int incidents = 0;
+    int interventions = 0;
+    final searches = <String>{};
     final facts = <String, int>{};
     final rescueQualifications = <String, int>{};
 
@@ -262,24 +292,28 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
         }
         continue;
       }
+      if (type == 'présence' || type == 'presence') continue;
 
-      if (type == 'présence' || type == 'presence') {
-        continue;
+      if (type == 'incident') incidents++;
+      if (type == 'intervention') interventions++;
+      if (type == 'personne recherchée') {
+        final caseId = (entry['searchCaseId'] ?? '').toString().trim();
+        final entryId = (entry['id'] ?? '').toString().trim();
+        // Anciens faits sans identifiant de recherche : un fait = un
+        // événement distinct. Ne jamais rapprocher deux noms de victimes.
+        searches.add(caseId.isNotEmpty ? 'case:' + caseId : 'entry:' + entryId);
       }
 
       String displayType = (entry['type'] ?? 'Observation').toString().trim();
-
-      if (type == 'vérification matériel' ||
-          type == 'verification materiel') {
+      if (type == 'vérification matériel' || type == 'verification materiel') {
         displayType = 'Matériel';
       }
-
       facts[displayType] = (facts[displayType] ?? 0) + 1;
 
-      if (type == 'secours' && entry['victim'] is Map) {
+      if ((type == 'secours' || type == 'intervention') &&
+          entry['victim'] is Map) {
         final victim = Map<String, dynamic>.from(entry['victim'] as Map);
-        final qualification =
-            (victim['qualification'] ?? '').toString().trim();
+        final qualification = (victim['qualification'] ?? '').toString().trim();
         if (qualification.isNotEmpty) {
           rescueQualifications[qualification] =
               (rescueQualifications[qualification] ?? 0) + 1;
@@ -287,14 +321,58 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
       }
     }
 
-    return _DailyStats(
-      date: day,
+    return _StatsSummary(
       greenFlags: green,
       yellowFlags: yellow,
       redFlags: red,
+      incidents: incidents,
+      interventions: interventions,
+      searches: searches.length,
       facts: facts,
       rescueQualifications: rescueQualifications,
     );
+  }
+
+  _DailyStats _statsForDay(DateTime day) {
+    final start = DateTime(day.year, day.month, day.day).millisecondsSinceEpoch;
+    final end = DateTime(day.year, day.month, day.day + 1).millisecondsSinceEpoch;
+    final summary = _summarize(_entries.where((entry) {
+      final millis = _entryMillis(entry);
+      return millis != null && millis >= start && millis < end;
+    }));
+    return _DailyStats(date: day, summary: summary);
+  }
+
+  _StatsSummary get _monthlySummary {
+    final start = DateTime(_selectedMonth.year, _selectedMonth.month)
+        .millisecondsSinceEpoch;
+    final end = DateTime(_selectedMonth.year, _selectedMonth.month + 1)
+        .millisecondsSinceEpoch;
+    return _summarize(_entries.where((entry) {
+      final millis = _entryMillis(entry);
+      return millis != null && millis >= start && millis < end;
+    }));
+  }
+
+  _StatsSummary get _seasonSummary {
+    return _summarize(_entries.where((entry) {
+      final millis = _entryMillis(entry);
+      if (millis == null) return false;
+      final key = _dayKey(DateTime.fromMillisecondsSinceEpoch(millis));
+      return _seasonPeriods.any((period) => period.contains(key));
+    }));
+  }
+
+  bool get _monthlyProvisional => DateTime.now().isBefore(
+        DateTime(_selectedMonth.year, _selectedMonth.month + 1),
+      );
+
+  bool get _seasonProvisional {
+    if (_seasonPeriods.isEmpty) return false;
+    final lastDay = _seasonPeriods
+        .map((period) => period.endDay)
+        .reduce((a, b) => a > b ? a : b);
+    return _dayKey(DateTime.now()) <= lastDay;
   }
 
   List<_DailyStats> get _dailyStats {
@@ -409,6 +487,149 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
     );
   }
 
+  Widget _eventCount({
+    required String label,
+    required int value,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 2),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.10),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withOpacity(0.75), width: 1),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 17, color: color),
+            const SizedBox(height: 2),
+            Text(
+              value.toString(),
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+            ),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 8, fontWeight: FontWeight.w800),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _eventRow(_StatsSummary summary) {
+    return Row(
+      children: [
+        _eventCount(
+          label: 'INCIDENTS',
+          value: summary.incidents,
+          icon: Icons.warning_amber_rounded,
+          color: const Color(0xFFDC2626),
+        ),
+        const SizedBox(width: 5),
+        _eventCount(
+          label: 'INTERVENTIONS',
+          value: summary.interventions,
+          icon: Icons.medical_services_outlined,
+          color: const Color(0xFF2563EB),
+        ),
+        const SizedBox(width: 5),
+        _eventCount(
+          label: 'RECHERCHES',
+          value: summary.searches,
+          icon: Icons.person_search_rounded,
+          color: const Color(0xFF546E7A),
+        ),
+      ],
+    );
+  }
+
+  Widget _summaryCard({
+    required String title,
+    required _StatsSummary summary,
+    required String subtitle,
+  }) {
+    final otherFacts = summary.facts.entries.where((entry) {
+      final type = entry.key.trim().toLowerCase();
+      return type != 'incident' &&
+          type != 'intervention' &&
+          type != 'personne recherchée';
+    }).toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+
+    return Container(
+      margin: const EdgeInsets.only(top: 8, bottom: 10),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.80),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _statsColor, width: 1.6),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: _statsColor,
+              fontWeight: FontWeight.w900,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            style: const TextStyle(color: Colors.black54, fontSize: 10),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _flagCount(
+                label: 'VERT',
+                value: summary.greenFlags,
+                color: const Color(0xFF22C55E),
+              ),
+              const SizedBox(width: 5),
+              _flagCount(
+                label: 'JAUNE',
+                value: summary.yellowFlags,
+                color: const Color(0xFFFDE047),
+              ),
+              const SizedBox(width: 5),
+              _flagCount(
+                label: 'ROUGE',
+                value: summary.redFlags,
+                color: const Color(0xFFEF4444),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _eventRow(summary),
+          if (otherFacts.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            const Text(
+              'AUTRES FAITS',
+              style: TextStyle(
+                color: _statsColor,
+                fontWeight: FontWeight.w900,
+                fontSize: 10,
+              ),
+            ),
+            ...otherFacts.map(
+              (entry) => Text(
+                entry.key + ' : ' + entry.value.toString(),
+                style: const TextStyle(fontSize: 10),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _dayCard(_DailyStats stats) {
     final factEntries = stats.facts.entries.toList()
       ..sort((a, b) => a.key.compareTo(b.key));
@@ -457,6 +678,12 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
               ),
             ],
           ),
+          if (stats.incidents > 0 ||
+              stats.interventions > 0 ||
+              stats.searches > 0) ...[
+            const SizedBox(height: 8),
+            _eventRow(stats.summary),
+          ],
           const SizedBox(height: 8),
           if (factEntries.isEmpty)
             const Text(
@@ -534,6 +761,8 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
   Future<Uint8List> _buildPdf() async {
     final document = pw.Document();
     final stats = _dailyStats;
+    final monthly = _monthlySummary;
+    final season = _seasonSummary;
 
     final totals = <String, int>{};
     int green = 0;
@@ -583,6 +812,13 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
             'Vert : $green   Jaune : $yellow   Rouge : $red',
             style: const pw.TextStyle(fontSize: 9),
           ),
+          pw.SizedBox(height: 6),
+          pw.Text(
+            'Incidents : ' + monthly.incidents.toString() +
+            '   Interventions : ' + monthly.interventions.toString() +
+            '   Recherches distinctes : ' + monthly.searches.toString(),
+            style: const pw.TextStyle(fontSize: 9),
+          ),
           pw.SizedBox(height: 10),
           pw.Text(
             'Faits - total période',
@@ -604,6 +840,41 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
                 style: const pw.TextStyle(fontSize: 9),
               ),
             ),
+          pw.SizedBox(height: 14),
+          pw.Text(
+            'Bilan de saison ' + _selectedMonth.year.toString(),
+            style: pw.TextStyle(
+              fontSize: 11,
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
+          if (_seasonPeriods.isEmpty)
+            pw.Text(
+              'Aucune période de surveillance affectée à ce poste.',
+              style: const pw.TextStyle(fontSize: 9),
+            )
+          else ...[
+            pw.Text(
+              _seasonProvisional ? 'Bilan provisoire' : 'Bilan de saison clos',
+              style: const pw.TextStyle(fontSize: 9),
+            ),
+            pw.Text(
+              'Drapeaux - Vert : ' + season.greenFlags.toString() +
+              '   Jaune : ' + season.yellowFlags.toString() +
+              '   Rouge : ' + season.redFlags.toString(),
+              style: const pw.TextStyle(fontSize: 9),
+            ),
+            pw.Text(
+              'Incidents : ' + season.incidents.toString() +
+              '   Interventions : ' + season.interventions.toString() +
+              '   Recherches distinctes : ' + season.searches.toString(),
+              style: const pw.TextStyle(fontSize: 9),
+            ),
+            ...season.facts.entries.map((entry) => pw.Text(
+                  entry.key + ' : ' + entry.value.toString(),
+                  style: const pw.TextStyle(fontSize: 8),
+                )),
+          ],
           pw.SizedBox(height: 14),
           pw.Text(
             'Détail jour par jour',
@@ -648,6 +919,12 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
                   ),
                   pw.Text(
                     facts.isEmpty ? 'Faits : aucun' : 'Faits : $facts',
+                    style: const pw.TextStyle(fontSize: 8),
+                  ),
+                  pw.Text(
+                    'Incidents : ' + day.incidents.toString() +
+                    ' | Interventions : ' + day.interventions.toString() +
+                    ' | Recherches distinctes : ' + day.searches.toString(),
                     style: const pw.TextStyle(fontSize: 8),
                   ),
                   if (rescue.isNotEmpty)
@@ -800,6 +1077,34 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
                                                   ),
                                                 ),
                                               ),
+                                            _summaryCard(
+                                              title: 'BILAN MENSUEL',
+                                              summary: _monthlySummary,
+                                              subtitle: _monthLabel +
+                                                  (_monthlyProvisional
+                                                      ? ' - PROVISOIRE'
+                                                      : ' - CLÔTURÉ'),
+                                            ),
+                                            if (_seasonPeriods.isNotEmpty)
+                                              _summaryCard(
+                                                title: 'BILAN SAISONNIER ' +
+                                                    _selectedMonth.year.toString(),
+                                                summary: _seasonSummary,
+                                                subtitle: _seasonProvisional
+                                                    ? 'En cours - provisoire'
+                                                    : 'Toutes les périodes de surveillance',
+                                              )
+                                            else
+                                              const Padding(
+                                                padding: EdgeInsets.all(12),
+                                                child: Text(
+                                                  'Bilan saisonnier indisponible : '
+                                                  'aucune période de surveillance '
+                                                  'affectée à ce poste.',
+                                                  textAlign: TextAlign.center,
+                                                  style: TextStyle(fontSize: 10),
+                                                ),
+                                              ),
                                             const SizedBox(height: 4),
                                             SizedBox(
                                               width: double.infinity,
@@ -888,20 +1193,49 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
   }
 }
 
-class _DailyStats {
-  final DateTime date;
+class _SeasonPeriod {
+  final int startDay;
+  final int endDay;
+
+  const _SeasonPeriod({required this.startDay, required this.endDay});
+
+  bool contains(int dayKey) => dayKey >= startDay && dayKey <= endDay;
+}
+
+class _StatsSummary {
   final int greenFlags;
   final int yellowFlags;
   final int redFlags;
+  final int incidents;
+  final int interventions;
+  final int searches;
   final Map<String, int> facts;
   final Map<String, int> rescueQualifications;
 
-  const _DailyStats({
-    required this.date,
+  const _StatsSummary({
     required this.greenFlags,
     required this.yellowFlags,
     required this.redFlags,
+    required this.incidents,
+    required this.interventions,
+    required this.searches,
     required this.facts,
     required this.rescueQualifications,
   });
+}
+
+class _DailyStats {
+  final DateTime date;
+  final _StatsSummary summary;
+
+  const _DailyStats({required this.date, required this.summary});
+
+  int get greenFlags => summary.greenFlags;
+  int get yellowFlags => summary.yellowFlags;
+  int get redFlags => summary.redFlags;
+  int get incidents => summary.incidents;
+  int get interventions => summary.interventions;
+  int get searches => summary.searches;
+  Map<String, int> get facts => summary.facts;
+  Map<String, int> get rescueQualifications => summary.rescueQualifications;
 }
