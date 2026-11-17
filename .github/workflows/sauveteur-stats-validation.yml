@@ -63,3 +63,6 @@ jobs:
             test/sauveteur_stats_display_test.dart \
             test/sauveteur_flag_rules_test.dart \
             test/sauveteur_preparation_rules_test.dart
+      - name: Compiler Android en mode debug sans publier
+        timeout-minutes: 25
+        run: flutter build apk --debug --no-pub --target lib/main.dart
