@@ -45,11 +45,18 @@ jobs:
     timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
+      - name: Utiliser Java 17 compatible avec Gradle 8.14
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
       - name: Installer Flutter stable
         run: |
           git clone --depth 1 --branch stable https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
           echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
           "$RUNNER_TEMP/flutter/bin/flutter" --version
+          "$RUNNER_TEMP/flutter/bin/flutter" config --jdk-dir="$JAVA_HOME"
+          java -version
       - name: Installer les dependances Flutter
         run: flutter pub get
       - name: Analyser STATS et son test
