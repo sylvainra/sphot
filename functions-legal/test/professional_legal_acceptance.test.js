@@ -286,3 +286,30 @@ test("PUBLICITAIRE : le contrat de statut ne change pas", async () => {
   assert.equal(status.required, true);
   assert.equal(Object.hasOwn(status, "adminChanges"), false);
 });
+
+test("ADMIN : la copie legacy exacte prime sur une version publiee obsolete", async () => {
+  const f = fixture("ADMIN");
+  const current = f.docs.get("legalDocuments/adminCgu");
+  current.version = "1.8";
+  current.revision = 1;
+  current.chapters[6].content = "Clause finale actualisée.";
+  const correct = JSON.parse(JSON.stringify(current.chapters));
+  correct[6].content = "Clause finale précédente.";
+  const obsolete = JSON.parse(JSON.stringify(current.chapters));
+  obsolete[0].content = "Texte plus ancien sans rapport.";
+  f.docs.set("legalVersions/adminCgu_r00000000_published", {
+    documentId: "adminCgu", version: "1.1", revision: 0,
+    chapters: obsolete,
+  });
+  f.docs.set("legalVersions/adminCgu_r00000000_legacy", {
+    documentId: "adminCgu", version: "1.7", revision: 0,
+    chapters: correct,
+  });
+  const status = await action({admin: f.admin, token: f.token,
+    input: {action: "status"}});
+  assert.equal(status.adminChanges.baselineVersionId, "1.7:r0");
+  assert.deepEqual(status.adminChanges.articles.map((item) => item.id),
+      ["07"]);
+  assert.equal(status.adminChanges.articles[0].blocks[0].after,
+      "Clause finale actualisée.");
+});
