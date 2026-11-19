@@ -93,7 +93,17 @@ function scenario(market = "ADMIN") {
   const db = {
     collection(collection) {
       return {doc(id) {
-        return {collection, id};
+        return {
+          collection, id,
+          async get() {
+            const item = saved.get(key(collection, id));
+            return {
+              exists: item !== undefined,
+              data: () => item === undefined ? undefined :
+                structuredClone(item),
+            };
+          },
+        };
       }};
     },
     async runTransaction(callback) {
