@@ -94,7 +94,7 @@ test("bloque une facture qui n'appartient pas a la commande", async () => {
     records[0].invoice.x_sphot_sale_order_id = [999, "autre"];
   });
   await assert.rejects(verifierRetourBackend({odooClient: f.client}),
-      /incoherente|incoh[eé]rente/);
+      /Facture Odoo non conforme|incoh/);
 });
 
 test("transport local : seule la copie et deux operations de lecture", async () => {
