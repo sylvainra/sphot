@@ -16,12 +16,13 @@ function etatPublic(provider) {
   const p = provider && typeof provider === "object" &&
       !Array.isArray(provider) ? provider : {};
   const id = Number.isSafeInteger(p.id) && p.id > 0 ? p.id : null;
-  const state = ["disabled", "test", "enabled"].includes(p.state) ?
-    p.state : "inconnu";
+  // Odoo 20 : le champ "state" a ete remplace par "is_live".
+  // Ne jamais deduire TEST d'un champ absent.
+  const live = typeof p.is_live === "boolean" ? p.is_live : null;
   const published = typeof p.is_published === "boolean" ?
     p.is_published : null;
   // Ne JAMAIS afficher des champs non listes, potentiellement secrets.
-  return Object.freeze({id, state, published});
+  return Object.freeze({id, live, published});
 }
 function resultatExamen(evidence, fingerprint) {
   exigence(evidence && typeof evidence === "object" &&
@@ -40,11 +41,10 @@ function resultatExamen(evidence, fingerprint) {
   const demo = evidence.demo_providers.map(etatPublic);
   // La presence du fournisseur Stripe ne prouve pas son mode TEST.
   // De meme, l'existence d'un fournisseur Demo ne dit pas s'il est publie.
-  const bloque = stripe.some(p => p.state === "enabled") ||
-      demo.some(p => p.published === true ||
-        (p.state === "enabled" && p.published !== false));
+  const bloque = stripe.some(p => p.live === true) ||
+      demo.some(p => p.published === true);
   const pret = !bloque && stripe.length === 1 &&
-      stripe[0].state === "test" && stripe[0].published === true &&
+      stripe[0].live === false && stripe[0].published === true &&
       demo.every(p => p.published === false) &&
       evidence.transactions.length === 0;
 
@@ -98,8 +98,10 @@ async function main() {
     for (const p of providers) {
       const pub = p.published === null ? "inconnu" :
         p.published ? "oui" : "non";
+      const mode = p.live === null ? "inconnu" :
+        p.live ? "LIVE" : "TEST";
       console.log("  id=" + (p.id ?? "inconnu") +
-        " ; etat=" + p.state + " ; publie=" + pub);
+        " ; mode=" + mode + " ; publie=" + pub);
     }
   }
   console.log("Transactions : " + result.transactions);
