@@ -7,8 +7,8 @@ const {etatPublic, resultatExamen, inspecterPrestataires} =
 
 const REF = "SPHOT-PUB-AD7D6478DECA71715DCD2321";
 const FP = "a".repeat(64);
-function fixture({stripe = [{id: 3, state: "test", is_published: true}],
-  demo = [{id: 2, state: "test", is_published: false}],
+function fixture({stripe = [{id: 3, is_live: false, is_published: true}],
+  demo = [{id: 2, is_live: false, is_published: false}],
   transactions = []} = {}) {
   return {
     contract: "sphot_advertiser_stripe_evidence_v1",
@@ -23,40 +23,40 @@ test("Stripe TEST publie, Demo non publie : configuration candidate",
       const result = resultatExamen(fixture(), FP);
       assert.equal(result.conclusion,
           "CONFIGURATION TEST COMPATIBLE (sans paiement)");
-      assert.equal(result.stripe[0].state, "test");
+      assert.equal(result.stripe[0].live, false);
       assert.equal(result.demo[0].published, false);
     });
 
 test("Demo publie : bloque, meme si Stripe est en TEST", () => {
   const r = resultatExamen(fixture({
-    demo: [{id: 2, state: "test", is_published: true}],
+    demo: [{id: 2, is_live: false, is_published: true}],
   }), FP);
   assert.equal(r.conclusion, "BLOQUE");
 });
 
 test("Stripe LIVE/enabled : refuse l'experimentation", () => {
   const r = resultatExamen(fixture({
-    stripe: [{id: 3, state: "enabled", is_published: true}],
+    stripe: [{id: 3, is_live: true, is_published: true}],
   }), FP);
   assert.equal(r.conclusion, "BLOQUE");
 });
 
-test("etat de publication manquant : aucune fausse certitude", () => {
+test("mode is_live absent : aucune fausse certitude", () => {
   const r = resultatExamen(fixture({
-    stripe: [{id: 3, state: "test"}],
-    demo: [{id: 2, state: "disabled"}],
+    stripe: [{id: 3, is_published: true}],
+    demo: [{id: 2, is_published: false}],
   }), FP);
   assert.match(r.conclusion, /A VERIFIER/);
 });
 
 test("l'audit ne divulgue jamais de cle secrete du prestataire", () => {
   const info = etatPublic({
-    id: 99, state: "test", is_published: true,
+    id: 99, is_live: false, is_published: true,
     stripe_secret_key: "sk_test_ne_jamais_afficher",
     private_key: "cle_confidentielle",
     merchant_account: "compte_confidentiel",
   });
-  assert.deepEqual(Object.keys(info), ["id", "state", "published"]);
+  assert.deepEqual(Object.keys(info), ["id", "live", "published"]);
   assert.doesNotMatch(JSON.stringify(info), /sk_test|confidentiel/);
 });
 
@@ -96,3 +96,18 @@ test("lecture uniquement par la methode metier et sans ecriture",
       assert.deepEqual(calls.map(c => c[1]),
           ["search_read", "read_stripe_checkout_evidence"]);
     });
+
+
+test("Odoo 20 : une chaine de texte ne prouve jamais le mode TEST", () => {
+  const r = resultatExamen(fixture({
+    stripe: [{id: 3, is_live: "false", is_published: true}],
+  }), FP);
+  assert.match(r.conclusion, /A VERIFIER/);
+});
+
+test("Stripe non publie : configuration non utilisable", () => {
+  const r = resultatExamen(fixture({
+    stripe: [{id: 3, is_live: false, is_published: false}],
+  }), FP);
+  assert.match(r.conclusion, /A VERIFIER/);
+});
