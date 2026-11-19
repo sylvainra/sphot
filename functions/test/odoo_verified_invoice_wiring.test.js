@@ -52,7 +52,7 @@ function fixture(market) {
     firestore,
   };
   const isPaid = {invoice: null};
-  const publishedPrices = isAdmin ? PRICES :
+  const publishedPrices = isAdmin ? PRICES.slice() :
     initialPrices();
   const type = isAdmin ? "ADMIN" : "ADVERTISER_RADIUS";
   const pricingReference = "FR_" + type + "-V2";
