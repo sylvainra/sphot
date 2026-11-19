@@ -284,3 +284,65 @@ test("Rattachement serveur bloque sans emulation Firestore explicite", async () 
     },
   }), /desactive/);
 });
+
+
+// Integration : la projection est relue par le lecteur de facturation SPHOT
+// existant, sans adapter son format ni attribuer de droits.
+const {readOdooBillingStatus} = require("../odoo_billing_status");
+
+for (const market of ["ADMIN", "ADVERTISER"]) {
+  test(market + " : le lecteur backend retrouve la facture rattachee",
+      async () => {
+        const s = scenario(market);
+        await s.execute();
+        const identity = {
+          ...s.identity,
+          dossier: market === "ADVERTISER" ?
+            s.saved.get("advertiserRequests/" + AID) : {},
+        };
+        let reads = 0;
+        const mockOdoo = {
+          async call(model, method, body) {
+            reads++;
+            if (model === "sale.order" && method === "search_read") {
+              assert.equal(body.domain[0][2], s.prepared.reference);
+              return [{
+                id: s.recu.orderId, name: s.recu.orderNumber,
+                state: "sale",
+                client_order_ref: s.prepared.reference,
+                x_sphot_reference: s.prepared.reference,
+                x_sphot_fingerprint: s.prepared.fingerprint,
+                invoice_ids: [s.recu.invoiceId],
+              }];
+            }
+            if (model === "account.move" && method === "read") {
+              assert.deepEqual(body.ids, [s.recu.invoiceId]);
+              return [{
+                id: s.recu.invoiceId, name: s.recu.invoiceNumber,
+                state: "posted", move_type: "out_invoice",
+                invoice_origin: s.recu.orderNumber,
+                payment_state: "not_paid",
+                currency_id: [1, "EUR"],
+                amount_total: s.recu.amountTotalCents / 100,
+                amount_residual: s.recu.amountTotalCents / 100,
+                x_sphot_reference: s.prepared.reference,
+                x_sphot_fingerprint: s.prepared.fingerprint,
+                x_sphot_sale_order_id: [
+                  s.recu.orderId, s.recu.orderNumber],
+              }];
+            }
+            throw Error("Lecture Odoo inattendue");
+          },
+        };
+        const status = await readOdooBillingStatus({
+          admin: {firestore: () => s.db},
+          identity, odooClient: mockOdoo,
+        });
+        assert.equal(status.status, "invoice_found");
+        assert.equal(status.invoiceState, "posted");
+        assert.equal(status.paymentState, "not_paid");
+        assert.equal(status.amountTotalCents, s.recu.amountTotalCents);
+        assert.equal(status.activatesCommercialRights, false);
+        assert.equal(reads, 2);
+      });
+}
