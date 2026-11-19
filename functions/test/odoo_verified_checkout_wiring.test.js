@@ -254,7 +254,7 @@ for (const marche of ["ADMIN", "ADVERTISER"]) {
         assert.equal(second.receipt.orderNumber,
             premier.receipt.orderNumber);
         assert.equal(f.getOdooCalls(), 1);
-        assert.equal(f.saved.size, marche === "ADMIN" ? 9 : 6);
+        assert.equal(f.saved.size, marche === "ADMIN" ? 8 : 6);
       });
 }
 
