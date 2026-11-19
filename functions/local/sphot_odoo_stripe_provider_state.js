@@ -42,11 +42,10 @@ function resultatExamen(evidence, fingerprint) {
   // De meme, l'existence d'un fournisseur Demo ne dit pas s'il est publie.
   const bloque = stripe.some(p => p.state === "enabled") ||
       demo.some(p => p.published === true ||
-        p.state === "enabled" || p.state === "test");
+        (p.state === "enabled" && p.published !== false));
   const pret = !bloque && stripe.length === 1 &&
       stripe[0].state === "test" && stripe[0].published === true &&
-      demo.every(p => p.state === "disabled" &&
-        p.published === false) &&
+      demo.every(p => p.published === false) &&
       evidence.transactions.length === 0;
 
   return Object.freeze({
